@@ -1,0 +1,100 @@
+import { NextRequest, NextResponse } from "next/server";
+import { ApiError, withErrorHandler } from "@/lib/api-error";
+import { requireAdmin } from "@/lib/api-auth";
+import { audit } from "@/lib/audit";
+import { CreateEnrollmentSchema } from "@/lib/schemas";
+import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+
+const StatusFilter = z.enum(["ACTIVE", "SUSPENDED", "CANCELLED", "COMPLETED"]);
+
+export const GET = withErrorHandler(async (req: NextRequest) => {
+  await requireAdmin();
+
+  const { searchParams } = new URL(req.url);
+  const rawStatus = searchParams.get("status");
+  // Valida o status contra o enum — evita repassar lixo direto ao Prisma.
+  let status: z.infer<typeof StatusFilter> | undefined;
+  if (rawStatus) {
+    const parsed = StatusFilter.safeParse(rawStatus);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Status inválido" }, { status: 400 });
+    }
+    status = parsed.data;
+  }
+
+  const enrollments = await prisma.enrollment.findMany({
+    where: status ? { status } : {},
+    include: {
+      student: true,
+      plan: true,
+      payments: { orderBy: { createdAt: "desc" }, take: 1 },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return NextResponse.json(enrollments);
+});
+
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const session = await requireAdmin();
+
+  const parsed = CreateEnrollmentSchema.safeParse(await req.json());
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Dados inválidos" },
+      { status: 400 }
+    );
+  }
+
+  const { studentId, planId, startDate, notes } = parsed.data;
+  const discount = parsed.data.discount ?? 0; // centavos
+
+  const plan = await prisma.plan.findUnique({ where: { id: planId } });
+  if (!plan) throw new ApiError(404, "Plano não encontrado");
+
+  // Desconto não pode exceder o valor do plano (garante mensalidade ≥ 0).
+  if (discount > plan.price) {
+    throw new ApiError(400, "Desconto maior que o valor do plano");
+  }
+
+  const start = new Date(startDate);
+  // Mês/ano da 1ª cobrança a partir da string "YYYY-MM-DD" (sem deslocamento de timezone).
+  const startYear = Number(startDate.slice(0, 4));
+  const startMonth = Number(startDate.slice(5, 7));
+  const monthlyAmount = plan.price - discount; // centavos
+
+  // Atômico: cria a matrícula + a 1ª mensalidade PENDENTE (registro interno; sem Mercado Pago).
+  const enrollment = await prisma.$transaction(async (tx) => {
+    const en = await tx.enrollment.create({
+      data: {
+        studentId,
+        planId,
+        startDate: start,
+        discount,
+        notes: notes || null,
+        status: "ACTIVE",
+      },
+      include: { student: true, plan: true },
+    });
+
+    await tx.payment.create({
+      data: {
+        enrollmentId: en.id,
+        studentId,
+        amount: monthlyAmount,
+        status: "PENDING",
+        description: `Mensalidade ${plan.name} — ${String(startMonth).padStart(2, "0")}/${startYear}`,
+        dueDate: start,
+        month: startMonth,
+        year: startYear,
+      },
+    });
+
+    return en;
+  });
+
+  await audit({ userId: session.user.id, action: "CREATE_ENROLLMENT", entity: "Enrollment", entityId: enrollment.id });
+
+  return NextResponse.json(enrollment, { status: 201 });
+});
