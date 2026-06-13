@@ -3,8 +3,6 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { isCourseUnlocked } from "@/lib/services/unlock";
-import { getCourseProgress } from "@/lib/services/progress";
 import { Card, Badge, SectionHeader } from "@/components/gw/primitives";
 import { BookOpen, Lock, CheckCircle, ArrowRight } from "lucide-react";
 
@@ -27,14 +25,27 @@ export default async function StudentCoursesPage() {
     },
   });
 
-  // Computa unlock + progresso por curso
-  const enriched = await Promise.all(
-    courses.map(async (c) => ({
-      course: c,
-      unlocked: await isCourseUnlocked(user.id, c.id),
-      progress: await getCourseProgress(user.id, c.id),
-    }))
-  );
+  // Unlock + progresso de TODOS os cursos em 3 queries agregadas (antes: 2N ops em série por curso).
+  const courseIds = courses.map((c) => c.id);
+  const [certs, moduleUnitCounts, completedGroups] = await Promise.all([
+    prisma.certificate.findMany({ where: { userId: user.id }, select: { courseId: true } }),
+    prisma.module.findMany({ where: { courseId: { in: courseIds } }, select: { courseId: true, _count: { select: { units: true } } } }),
+    prisma.userUnitProgress.groupBy({ by: ["courseId"], where: { userId: user.id, courseId: { in: courseIds }, completed: true }, _count: { _all: true } }),
+  ]);
+  const certSet = new Set(certs.map((c) => c.courseId));
+  const totalUnits = new Map<string, number>();
+  for (const m of moduleUnitCounts) totalUnits.set(m.courseId, (totalUnits.get(m.courseId) ?? 0) + m._count.units);
+  const completedCount = new Map<string, number>();
+  for (const g of completedGroups) completedCount.set(g.courseId, g._count._all);
+
+  const enriched = courses.map((c) => {
+    // desbloqueado se todo pré-requisito tem certificado emitido (prereqs já vêm no include)
+    const unlocked = c.prerequisites.every((p) => certSet.has(p.requiredCourseId));
+    const total = totalUnits.get(c.id) ?? 0;
+    const done = completedCount.get(c.id) ?? 0;
+    const progress = total ? Math.round((done / total) * 100) : 0;
+    return { course: c, unlocked, progress };
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--gap)" }}>

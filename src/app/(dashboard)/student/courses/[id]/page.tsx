@@ -19,13 +19,18 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   if (!user) redirect("/login");
 
   const { id } = await params;
-  const course = await prisma.course.findUnique({
-    where: { id },
-    include: { modules: { orderBy: { order: "asc" }, include: { units: { orderBy: { order: "asc" } } } } },
-  });
+  // Independentes entre si → uma única ida ao banco em vez de 3 em série.
+  const [course, unlocked, ordered, completed] = await Promise.all([
+    prisma.course.findUnique({
+      where: { id },
+      include: { modules: { orderBy: { order: "asc" }, include: { units: { orderBy: { order: "asc" } } } } },
+    }),
+    isCourseUnlocked(user.id, id),
+    getOrderedUnits(id),
+    getCompletedUnitIds(user.id, id),
+  ]);
   if (!course) notFound();
 
-  const unlocked = await isCourseUnlocked(user.id, id);
   if (!unlocked) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--gap)" }}>
@@ -39,8 +44,6 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
     );
   }
 
-  const ordered = await getOrderedUnits(id);
-  const completed = await getCompletedUnitIds(user.id, id);
   const doneCount = ordered.filter((u) => completed.has(u.id)).length;
   const progress = ordered.length ? Math.round((doneCount / ordered.length) * 100) : 0;
 

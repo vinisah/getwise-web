@@ -31,7 +31,10 @@ const basePayment = {
 
 beforeEach(() => {
   mockSession.mockResolvedValue(adminSession as any);
-  (mockPrisma.$transaction as any).mockImplementation((cb: any) => cb(mockPrisma));
+  // $transaction aceita callback interativo OU array de promises.
+  (mockPrisma.$transaction as any).mockImplementation((arg: any) =>
+    Array.isArray(arg) ? Promise.all(arg) : arg(mockPrisma)
+  );
   (mockPrisma.auditLog.create as any).mockResolvedValue({});
 });
 

@@ -43,26 +43,28 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // Mesmo dia do mês, limitado ao último dia do mês alvo. Datas em UTC−3 (Brasília).
   const lastDayOfTarget = new Date(Date.UTC(year, month, 0)).getUTCDate();
 
-  let created = 0;
-  for (const s of toCreate) {
-    const day = Math.min(s.date.getUTCDate(), lastDayOfTarget);
-    await prisma.financialTransaction.create({
-      data: {
-        type: s.type,
-        amount: s.amount,
-        description: s.description,
-        date: new Date(Date.UTC(year, month - 1, day, 3, 0, 0)),
-        dueDate: s.dueDate ? new Date(Date.UTC(year, month - 1, day, 3, 0, 0)) : null,
-        categoryId: s.categoryId,
-        isPaid: false,
-        isRecurring: true,
-        paymentMethod: s.paymentMethod,
-        notes: s.notes,
-        createdBy: session.user.id,
-      },
-    });
-    created += 1;
-  }
+  // Cria tudo numa única transação (atômico + 1 ida ao banco em vez de N).
+  await prisma.$transaction(
+    toCreate.map((s) => {
+      const day = Math.min(s.date.getUTCDate(), lastDayOfTarget);
+      return prisma.financialTransaction.create({
+        data: {
+          type: s.type,
+          amount: s.amount,
+          description: s.description,
+          date: new Date(Date.UTC(year, month - 1, day, 3, 0, 0)),
+          dueDate: s.dueDate ? new Date(Date.UTC(year, month - 1, day, 3, 0, 0)) : null,
+          categoryId: s.categoryId,
+          isPaid: false,
+          isRecurring: true,
+          paymentMethod: s.paymentMethod,
+          notes: s.notes,
+          createdBy: session.user.id,
+        },
+      });
+    })
+  );
+  const created = toCreate.length;
 
   await audit({ userId: session.user.id, action: "GENERATE_RECURRING", entity: "FinancialTransaction", payload: { month, year, created, skipped: sources.length - created } });
 

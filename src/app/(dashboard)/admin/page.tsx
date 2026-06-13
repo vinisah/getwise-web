@@ -28,37 +28,33 @@ export default async function AdminDashboard() {
   const now = new Date();
   const { gte: firstDay, lte: lastDay } = monthRangeBrasilia(now.getFullYear(), now.getMonth() + 1);
 
-  const [totalStudents, activeEnrollments, monthlyIncome, monthlyExpenses, upcomingLessons, recentPayments, enrollmentsByPlan, sixMonthsTx] =
-    await Promise.all([
-      prisma.user.count({ where: { role: "STUDENT" } }),
-      prisma.enrollment.count({ where: { status: "ACTIVE" } }),
-      prisma.financialTransaction.aggregate({ where: { type: "INCOME", date: { gte: firstDay, lte: lastDay }, isPaid: true }, _sum: { amount: true } }),
-      prisma.financialTransaction.aggregate({ where: { type: "EXPENSE", date: { gte: firstDay, lte: lastDay }, isPaid: true }, _sum: { amount: true } }),
-      prisma.lesson.findMany({
-        where: { scheduledAt: { gte: now }, status: "SCHEDULED" },
-        include: { teacher: true, bookings: true },
-        orderBy: { scheduledAt: "asc" },
-        take: 5,
-      }),
-      prisma.payment.findMany({ include: { student: true }, orderBy: { createdAt: "desc" }, take: 5 }),
-      prisma.enrollment.groupBy({ by: ["planId"], where: { status: "ACTIVE" }, _count: { _all: true } }),
-      prisma.financialTransaction.findMany({
-        where: { date: { gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) }, isPaid: true },
-        select: { type: true, amount: true, date: true },
-      }),
-    ]);
-
-  // KPIs do dono: MRR, inadimplência, custo da folha, margem estimada.
-  const [activeEnrollmentList, overduePayments, activeEmployees] = await Promise.all([
-    prisma.enrollment.findMany({
-      where: { status: "ACTIVE" },
-      select: { discount: true, plan: { select: { price: true } } },
+  // Todas as queries do dashboard são independentes → uma única ida ao banco
+  // (antes: 3 Promise.all em série = 3 RTTs no caminho crítico).
+  const [
+    totalStudents, activeEnrollments, monthlyIncome, monthlyExpenses, upcomingLessons,
+    recentPayments, sixMonthsTx, planStats,
+    activeEnrollmentList, overduePayments, activeEmployees,
+  ] = await Promise.all([
+    prisma.user.count({ where: { role: "STUDENT" } }),
+    prisma.enrollment.count({ where: { status: "ACTIVE" } }),
+    prisma.financialTransaction.aggregate({ where: { type: "INCOME", date: { gte: firstDay, lte: lastDay }, isPaid: true }, _sum: { amount: true } }),
+    prisma.financialTransaction.aggregate({ where: { type: "EXPENSE", date: { gte: firstDay, lte: lastDay }, isPaid: true }, _sum: { amount: true } }),
+    prisma.lesson.findMany({
+      where: { scheduledAt: { gte: now }, status: "SCHEDULED" },
+      include: { teacher: true, bookings: true },
+      orderBy: { scheduledAt: "asc" },
+      take: 5,
     }),
-    prisma.payment.aggregate({
-      where: { status: "PENDING", dueDate: { lt: now } },
-      _sum: { amount: true },
-      _count: { _all: true },
+    prisma.payment.findMany({ include: { student: true }, orderBy: { createdAt: "desc" }, take: 5 }),
+    prisma.financialTransaction.findMany({
+      where: { date: { gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) }, isPaid: true },
+      select: { type: true, amount: true, date: true },
     }),
+    // Donut: nome + nº de matrículas ativas por plano numa query só (sem groupBy + lookup dependente).
+    prisma.plan.findMany({ select: { id: true, name: true, _count: { select: { enrollments: { where: { status: "ACTIVE" } } } } } }),
+    // KPIs do dono
+    prisma.enrollment.findMany({ where: { status: "ACTIVE" }, select: { discount: true, plan: { select: { price: true } } } }),
+    prisma.payment.aggregate({ where: { status: "PENDING", dueDate: { lt: now } }, _sum: { amount: true }, _count: { _all: true } }),
     prisma.employee.findMany({ where: { isActive: true }, select: { salary: true, dependents: true, contractType: true } }),
   ]);
 
@@ -88,14 +84,14 @@ export default async function AdminDashboard() {
     months.push({ m: label, in: Math.round(inSum / 100_000), out: Math.round(outSum / 100_000) });
   }
 
-  // Donut matrículas por plano
-  const planIds = enrollmentsByPlan.map((e) => e.planId);
-  const plans = await prisma.plan.findMany({ where: { id: { in: planIds } } });
-  const donutData = enrollmentsByPlan.map((e, i) => ({
-    name: plans.find((p) => p.id === e.planId)?.name ?? "Plano",
-    value: e._count._all,
-    color: DONUT_COLORS[i % DONUT_COLORS.length],
-  }));
+  // Donut matrículas por plano (só planos com matrícula ativa)
+  const donutData = planStats
+    .filter((p) => p._count.enrollments > 0)
+    .map((p, i) => ({
+      name: p.name,
+      value: p._count.enrollments,
+      color: DONUT_COLORS[i % DONUT_COLORS.length],
+    }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--gap)" }}>

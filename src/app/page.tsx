@@ -1,17 +1,9 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
-export default async function RootPage() {
-  const session = await getServerSession(authOptions);
-
-  if (!session) {
-    redirect("/login");
-  }
-
-  const role = (session.user as any)?.role;
-
-  if (role === "ADMIN") redirect("/admin");
-  if (role === "TEACHER") redirect("/teacher");
-  redirect("/student");
+/**
+ * O roteamento por papel acontece no middleware (lê o JWT e redireciona direto
+ * para a home do papel). Esta página só é alcançada sem sessão → vai pro login.
+ */
+export default function RootPage() {
+  redirect("/login");
 }

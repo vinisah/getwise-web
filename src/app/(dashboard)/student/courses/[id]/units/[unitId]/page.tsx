@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
+import { after } from "next/server";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { isCourseUnlocked, getOrderedUnits, getCompletedUnitIds, isUnitUnlocked } from "@/lib/services/unlock";
@@ -20,28 +21,34 @@ export default async function UnitPage({ params }: { params: Promise<{ id: strin
 
   const { id: courseId, unitId } = await params;
 
-  const unit = await prisma.unit.findUnique({
-    where: { id: unitId },
-    include: {
-      module: { include: { course: true } },
-      exercises: { where: { isActive: true }, orderBy: { order: "asc" } },
-      materials: { orderBy: { createdAt: "asc" } },
-    },
-  });
+  // Tudo independente entre si → uma única ida ao banco (em vez de 5 em série).
+  // vp também: depende só de userId+unitId (já conhecidos); usado só se hasVideo.
+  const [unit, ordered, completed, courseUnlocked, vp] = await Promise.all([
+    prisma.unit.findUnique({
+      where: { id: unitId },
+      include: {
+        module: { include: { course: true } },
+        exercises: { where: { isActive: true }, orderBy: { order: "asc" } },
+        materials: { orderBy: { createdAt: "asc" } },
+      },
+    }),
+    getOrderedUnits(courseId),
+    getCompletedUnitIds(user.id, courseId),
+    isCourseUnlocked(user.id, courseId),
+    prisma.unitVideoProgress.findUnique({ where: { userId_unitId: { userId: user.id, unitId } } }),
+  ]);
   if (!unit || unit.module.courseId !== courseId) notFound();
 
-  // Guards de bloqueio (aluno)
-  const ordered = await getOrderedUnits(courseId);
-  const completed = await getCompletedUnitIds(user.id, courseId);
-  const courseUnlocked = await isCourseUnlocked(user.id, courseId);
+  // Guards de bloqueio (aluno) — funções puras sobre os dados já carregados
   const unitUnlocked = isUnitUnlocked(unitId, ordered, completed);
 
   if (user.role === "STUDENT" && (!courseUnlocked || !unitUnlocked)) {
     redirect(`/student/courses/${courseId}`);
   }
 
+  // Registro de acesso é write — fora do caminho crítico de render (após resposta).
   if (user.role === "STUDENT") {
-    await touchUnitAccess(user.id, unitId, courseId);
+    after(() => touchUnitAccess(user.id, unitId, courseId));
   }
 
   const isDone = completed.has(unitId);
@@ -50,11 +57,6 @@ export default async function UnitPage({ params }: { params: Promise<{ id: strin
   const hasVideo = (unit.type === "VIDEO" || unit.type === "MIXED") && !!unit.videoUrl;
   const hasReading = unit.type === "READING" || unit.type === "MIXED" || !unit.videoUrl;
   const requiredExercises = unit.exercises.filter((e) => e.isRequired);
-
-  // Estado do vídeo (resume + lock de exercícios)
-  const vp = hasVideo
-    ? await prisma.unitVideoProgress.findUnique({ where: { userId_unitId: { userId: user.id, unitId } } })
-    : null;
   const videoWatched = (vp?.watchedPercent ?? 0) >= 90;
   const exercisesLocked = hasVideo && !videoWatched;
 
