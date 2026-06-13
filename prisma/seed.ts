@@ -144,6 +144,7 @@ async function main() {
     skipDuplicates: true,
     data: [
       {
+        id: "seed-ex-1",
         title: "Present Simple vs. Present Continuous",
         type: "MULTIPLE_CHOICE",
         level: "B1",
@@ -156,6 +157,7 @@ async function main() {
         points: 10,
       },
       {
+        id: "seed-ex-2",
         title: "Vocabulary: Common Phrasal Verbs",
         type: "MULTIPLE_CHOICE",
         level: "B1",
@@ -168,6 +170,7 @@ async function main() {
         points: 10,
       },
       {
+        id: "seed-ex-3",
         title: "True or False: Grammar Rule",
         type: "TRUE_FALSE",
         level: "A1",
@@ -179,6 +182,7 @@ async function main() {
         points: 5,
       },
       {
+        id: "seed-ex-4",
         title: "Fill in the blank",
         type: "FILL_IN_BLANK",
         level: "A2",

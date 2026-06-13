@@ -14,6 +14,10 @@ const BrlAmount = z.coerce
   .max(1_000_000, "Valor máximo: R$ 1.000.000")
   .transform(reaisToCents);
 
+// Datas vêm como string (input/JSON). Validar parse evita `new Date("lixo")` → Invalid Date → 500.
+const DateString = z.string().min(1, "Data obrigatória").refine((v) => !Number.isNaN(Date.parse(v)), "Data inválida");
+const OptionalDateString = z.string().refine((v) => v === "" || !Number.isNaN(Date.parse(v)), "Data inválida").optional();
+
 // ─── Alunos ──────────────────────────────────────────────────────────────────
 
 export const CreateStudentSchema = z.object({
@@ -22,7 +26,7 @@ export const CreateStudentSchema = z.object({
   password: z.string().min(6, "Mínimo 6 caracteres").max(100),
   phone: BrazilianPhone,
   cpf: CPF,
-  birthDate: z.string().optional(),
+  birthDate: OptionalDateString,
   address: z.string().max(200).optional(),
   city: z.string().max(100).optional(),
   state: z.string().length(2).optional(),
@@ -37,7 +41,7 @@ export const CreateStudentSchema = z.object({
 export const CreateEnrollmentSchema = z.object({
   studentId: z.string().min(1, "ID inválido"),
   planId: z.string().min(1, "ID inválido"),
-  startDate: z.string().min(1, "Data obrigatória"),
+  startDate: DateString,
   // reais → centavos (Int)
   discount: z.coerce.number().min(0).max(10_000).transform(reaisToCents).optional(),
   notes: z.string().max(1000).optional(),
@@ -60,7 +64,7 @@ export const CreateLessonSchema = z.object({
   title: z.string().min(2).max(200),
   teacherId: z.string().optional(),
   description: z.string().max(1000).optional(),
-  scheduledAt: z.string().min(1, "Data obrigatória"),
+  scheduledAt: DateString,
   duration: z.coerce.number().int().min(15).max(180).default(50),
   meetingUrl: z.string().url("URL inválida").optional().or(z.literal("")),
   level: CEFRLevel.default("A1"),
@@ -77,7 +81,7 @@ export const CreateEmployeeSchema = z.object({
   salary: BrlAmount,
   contractType: z.enum(["CLT", "PJ", "HOURLY"]).default("CLT"),
   dependents: z.coerce.number().int().min(0).max(20).default(0),
-  startDate: z.string().min(1),
+  startDate: DateString,
   email: z.string().email().optional().or(z.literal("")),
   phone: BrazilianPhone,
   cpf: CPF,
@@ -90,8 +94,8 @@ export const CreateTransactionSchema = z.object({
   type: z.enum(["INCOME", "EXPENSE"]),
   amount: BrlAmount,
   description: z.string().min(1).max(200),
-  date: z.string().min(1, "Data obrigatória"),
-  dueDate: z.string().optional(),
+  date: DateString,
+  dueDate: OptionalDateString,
   categoryId: z.string().optional(),
   isPaid: z.boolean().or(z.enum(["true", "false"]).transform((v) => v === "true")).default(false),
   isRecurring: z.boolean().or(z.enum(["true", "false"]).transform((v) => v === "true")).default(false),
@@ -181,21 +185,30 @@ const ExerciseTypeEnum = z.enum([
   "PRONUNCIATION",
 ]);
 
-export const CreateExerciseSchema = z.object({
-  title: z.string().min(2).max(200),
-  type: ExerciseTypeEnum,
-  level: CEFRLevel.default("A1"),
-  content: z.record(z.string(), z.unknown()),
-  correctAnswer: z.unknown().optional(),
-  explanation: z.string().max(1000).optional(),
-  description: z.string().max(500).optional(),
-  points: z.coerce.number().int().min(1).max(100).default(10),
-  timeLimit: z.coerce.number().int().min(10).max(3600).optional(),
-  lessonId: z.string().optional(),
-  unitId: z.string().optional(),
-  isRequired: z.boolean().default(true),
-  order: z.coerce.number().int().min(0).max(999).default(0),
-});
+// Tipos corrigidos automaticamente → exigem correctAnswer (senão exercício insolúvel).
+const AUTO_GRADED = new Set(["MULTIPLE_CHOICE", "FILL_IN_BLANK", "TRUE_FALSE", "WORD_MATCH", "TRANSLATION", "SENTENCE_ORDER"]);
+
+export const CreateExerciseSchema = z
+  .object({
+    title: z.string().min(2).max(200),
+    type: ExerciseTypeEnum,
+    level: CEFRLevel.default("A1"),
+    content: z.record(z.string(), z.unknown()),
+    correctAnswer: z.unknown().optional(),
+    explanation: z.string().max(1000).optional(),
+    description: z.string().max(500).optional(),
+    points: z.coerce.number().int().min(1).max(100).default(10),
+    timeLimit: z.coerce.number().int().min(10).max(3600).optional(),
+    lessonId: z.string().optional(),
+    unitId: z.string().optional(),
+    isRequired: z.boolean().default(true),
+    order: z.coerce.number().int().min(0).max(999).default(0),
+  })
+  .superRefine((d, ctx) => {
+    if (AUTO_GRADED.has(d.type) && (d.correctAnswer === undefined || d.correctAnswer === null || d.correctAnswer === "")) {
+      ctx.addIssue({ code: "custom", path: ["correctAnswer"], message: `correctAnswer é obrigatório para ${d.type}` });
+    }
+  });
 
 export const VideoProgressSchema = z.object({
   positionSeconds: z.coerce.number().int().min(0).max(86400),

@@ -79,10 +79,15 @@ export async function audit(params: AuditParams): Promise<void> {
 }
 
 /**
- * Extrai IP do request de forma segura (funciona atrás de proxy/CDN).
+ * Extrai IP do request (atrás de proxy/CDN).
+ * ⚠️ `x-forwarded-for` é spoofável pelo cliente; preferimos `x-real-ip` (setado
+ * pela plataforma/Vercel). Para rate-limit robusto, usar o IP confiável do host.
  */
 export function getClientIp(req: Request): string {
-  const forwardedFor = (req.headers as Headers).get?.("x-forwarded-for");
+  const h = req.headers as Headers;
+  const realIp = h.get?.("x-real-ip");
+  if (realIp) return realIp.trim();
+  const forwardedFor = h.get?.("x-forwarded-for");
   if (forwardedFor) return forwardedFor.split(",")[0].trim();
   return "unknown";
 }

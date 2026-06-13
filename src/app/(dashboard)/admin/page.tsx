@@ -102,7 +102,7 @@ export default async function AdminDashboard() {
         <StatCard label="Despesas do mês" value={fmtCents(expenses)} sub={`Saldo ${fmtCents(balance)}`} icon={Wallet} tone="amber" spark={months.map((m) => m.out || 1)} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--gap)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--gap)" }}>
         {[
           { icon: Repeat, label: "MRR (mensalidades ativas)", value: fmtCents(mrr), color: "var(--accent)", href: "/admin/enrollments" },
           { icon: AlertCircle, label: `Inadimplência (${overdueCount} venc.)`, value: fmtCents(overdueAmount), color: overdueAmount > 0 ? "var(--danger)" : "var(--success)", href: "/admin/receivables" },

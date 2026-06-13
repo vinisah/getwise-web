@@ -3,12 +3,13 @@ import { withErrorHandler } from "@/lib/api-error";
 import { requireAuth, requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 import { UpdateCourseSchema } from "@/lib/schemas";
+import { isCourseUnlocked, getOrderedUnits, getCompletedUnitIds, isUnitUnlocked } from "@/lib/services/unlock";
 import { prisma } from "@/lib/prisma";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
-  await requireAuth();
+  const session = await requireAuth();
   const { id } = await (ctx as Ctx).params;
 
   const course = await prisma.course.findUnique({
@@ -20,6 +21,21 @@ export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
   });
 
   if (!course) return NextResponse.json({ error: "Curso não encontrado" }, { status: 404 });
+
+  // Aluno: oculta o conteúdo de unidades bloqueadas (gate de conteúdo).
+  if (session.user.role === "STUDENT") {
+    const [unlocked, ordered, completed] = await Promise.all([
+      isCourseUnlocked(session.user.id, id),
+      getOrderedUnits(id),
+      getCompletedUnitIds(session.user.id, id),
+    ]);
+    course.modules.forEach((m) =>
+      m.units.forEach((u) => {
+        if (!unlocked || !isUnitUnlocked(u.id, ordered, completed)) u.content = "";
+      })
+    );
+  }
+
   return NextResponse.json(course);
 });
 

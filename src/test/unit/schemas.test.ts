@@ -3,6 +3,7 @@ import {
   CreateStudentSchema,
   CreateTransactionSchema,
   CreateEmployeeSchema,
+  CreateExerciseSchema,
   AiMessageSchema,
   ExerciseAttemptSchema,
 } from "@/lib/schemas";
@@ -76,6 +77,23 @@ describe("CreateTransactionSchema", () => {
   it("converte centavos fracionados sem erro de float (19.99 → 1999)", () => {
     const r = CreateTransactionSchema.safeParse({ ...valid, amount: 19.99 });
     expect(r.success && r.data.amount).toBe(1999);
+  });
+
+  it("rejeita data inválida (evita Invalid Date → 500)", () => {
+    expect(CreateTransactionSchema.safeParse({ ...valid, date: "lixo" }).success).toBe(false);
+  });
+});
+
+describe("CreateExerciseSchema (shape)", () => {
+  const base = { title: "Teste", type: "MULTIPLE_CHOICE", content: { question: "q", options: ["a", "b"] } };
+
+  it("exige correctAnswer em tipos auto-corrigidos", () => {
+    expect(CreateExerciseSchema.safeParse(base).success).toBe(false); // sem correctAnswer
+    expect(CreateExerciseSchema.safeParse({ ...base, correctAnswer: "a" }).success).toBe(true);
+  });
+
+  it("não exige correctAnswer em WRITING (corrigido manualmente)", () => {
+    expect(CreateExerciseSchema.safeParse({ ...base, type: "WRITING", content: { prompt: "x" } }).success).toBe(true);
   });
 });
 

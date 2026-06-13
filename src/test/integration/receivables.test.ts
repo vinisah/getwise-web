@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { PATCH as paymentPATCH } from "@/app/api/payments/[id]/route";
 import { POST as recurringPOST } from "@/app/api/financial/recurring/route";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
+
+const P2002 = new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "7" });
 
 const mockSession = vi.mocked(getServerSession);
 const mockPrisma = vi.mocked(prisma);
@@ -72,15 +75,24 @@ describe("PATCH /api/payments/[id]", () => {
     expect(txArg.description).toContain("multa e juros");
   });
 
-  it("PAID é idempotente: não duplica receita se já existe", async () => {
-    (mockPrisma.payment.findUnique as any).mockResolvedValueOnce(basePayment);
-    (mockPrisma.payment.update as any).mockResolvedValueOnce({ ...basePayment, status: "PAID" });
-    (mockPrisma.financialTransaction.findFirst as any).mockResolvedValueOnce({ id: "tx-exists" });
+  it("PAID idempotente: já paga (amountPaid set) → no-op, sem duplicar receita", async () => {
+    (mockPrisma.payment.findUnique as any).mockResolvedValueOnce({ ...basePayment, status: "PAID", amountPaid: 34700 });
 
     const res = await paymentPATCH(req("http://localhost/api/payments/pay1", "PATCH", { status: "PAID" }), ctx as any);
 
     expect(res.status).toBe(200);
+    expect(mockPrisma.payment.update).not.toHaveBeenCalled();
     expect(mockPrisma.financialTransaction.create).not.toHaveBeenCalled();
+  });
+
+  it("PAID idempotente: reference duplicada (P2002) é silenciada", async () => {
+    (mockPrisma.payment.findUnique as any).mockResolvedValueOnce(basePayment);
+    (mockPrisma.payment.update as any).mockResolvedValueOnce({ ...basePayment, status: "PAID" });
+    (mockPrisma.financialTransaction.create as any).mockRejectedValueOnce(P2002);
+
+    const res = await paymentPATCH(req("http://localhost/api/payments/pay1", "PATCH", { status: "PAID" }), ctx as any);
+
+    expect(res.status).toBe(200); // P2002 capturado, não vira erro
   });
 
   it("PENDING remove a receita vinculada", async () => {
@@ -103,6 +115,7 @@ describe("PATCH /api/payments/[id]", () => {
 
 describe("POST /api/financial/recurring", () => {
   const recurringTx = {
+    id: "src1",
     type: "EXPENSE",
     amount: 150000,
     description: "Aluguel",
@@ -113,10 +126,8 @@ describe("POST /api/financial/recurring", () => {
     notes: null,
   };
 
-  it("clona recorrentes do mês anterior para o mês alvo", async () => {
-    (mockPrisma.financialTransaction.findMany as any)
-      .mockResolvedValueOnce([recurringTx]) // sources (maio)
-      .mockResolvedValueOnce([]); // existing no alvo (junho)
+  it("clona recorrentes do mês anterior com reference estável", async () => {
+    (mockPrisma.financialTransaction.findMany as any).mockResolvedValueOnce([recurringTx]); // sources (maio)
     (mockPrisma.financialTransaction.create as any).mockResolvedValueOnce({});
 
     const res = await recurringPOST(req("http://localhost/api/financial/recurring", "POST", { month: 6, year: 2026 }));
@@ -126,22 +137,20 @@ describe("POST /api/financial/recurring", () => {
     expect(body.created).toBe(1);
     const created = (mockPrisma.financialTransaction.create as any).mock.calls[0][0].data;
     expect(created.description).toBe("Aluguel");
-    expect(created.isPaid).toBe(false);
     expect(created.isRecurring).toBe(true);
+    expect(created.reference).toBe("recurring:src1:06/2026"); // idempotência estável
     expect(created.date.getUTCMonth()).toBe(5); // junho (0-based)
   });
 
-  it("dedupe: não duplica se a descrição já existe no mês alvo", async () => {
-    (mockPrisma.financialTransaction.findMany as any)
-      .mockResolvedValueOnce([recurringTx])
-      .mockResolvedValueOnce([{ description: "Aluguel" }]);
+  it("dedupe: P2002 (já gerada no mês) → pula, sem duplicar", async () => {
+    (mockPrisma.financialTransaction.findMany as any).mockResolvedValueOnce([recurringTx]);
+    (mockPrisma.financialTransaction.create as any).mockRejectedValueOnce(P2002); // reference já existe
 
     const res = await recurringPOST(req("http://localhost/api/financial/recurring", "POST", { month: 6, year: 2026 }));
 
     const body = await res.json();
     expect(body.created).toBe(0);
     expect(body.skipped).toBe(1);
-    expect(mockPrisma.financialTransaction.create).not.toHaveBeenCalled();
   });
 
   it("400 para mês inválido", async () => {

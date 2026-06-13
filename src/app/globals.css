@@ -114,6 +114,17 @@ a { color: inherit; }
 }
 .gw-content { padding: var(--pad); padding-top: 24px; }
 
+/* Hambúrguer (só aparece no mobile/tablet via media query) */
+.gw-burger {
+  display: none; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 11px; border: 1px solid var(--line);
+  background: var(--card); color: var(--ink-2); cursor: pointer; transition: all .15s;
+}
+.gw-burger:hover { color: var(--ink); border-color: #d3d9ea; background: var(--panel); }
+
+/* Backdrop do drawer mobile */
+.gw-backdrop { display: none; }
+
 .gw-search {
   display: flex; align-items: center; gap: 9px; background: var(--card); border: 1px solid var(--line);
   border-radius: 11px; padding: 9px 12px; width: 230px; transition: border-color .15s, box-shadow .15s;
@@ -156,7 +167,7 @@ a { color: inherit; }
 .gw-row:first-child { padding-top: 2px; }
 
 /* table */
-.gw-table { width: 100%; border-collapse: collapse; }
+.gw-table { width: 100%; border-collapse: collapse; min-width: 600px; }
 .gw-table th {
   text-align: left; font-size: 11px; font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--muted); font-weight: 600; padding: 14px 18px; border-bottom: 1px solid var(--line);
@@ -280,11 +291,26 @@ a { color: inherit; }
   .gw-two-col { grid-template-columns: 1fr; }
 }
 @media (max-width: 920px) {
-  .gw-sidebar { display: none; }
+  /* Sidebar vira drawer off-canvas (antes ficava display:none = sem navegação) */
+  .gw-sidebar {
+    position: fixed; top: 0; left: 0; height: 100dvh; z-index: 60;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 0 20px 60px rgba(16, 22, 48, .45);
+  }
+  .gw-sidebar.gw-open { transform: translateX(0); }
+  .gw-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 55;
+    background: rgba(16, 22, 48, .5); backdrop-filter: blur(2px);
+  }
+  .gw-burger { display: inline-flex; }
   .gw-login { grid-template-columns: 1fr; }
   .gw-login-brand { display: none; }
   .gw-quick-grid { grid-template-columns: 1fr; }
   .gw-search { display: none; }
+}
+/* Tabelas largas: scroll horizontal no mobile (card vira o container que rola) */
+@media (max-width: 760px) {
+  .gw-card { overflow-x: auto; }
 }
 @media (max-width: 560px) {
   .gw-stats-grid { grid-template-columns: 1fr; }

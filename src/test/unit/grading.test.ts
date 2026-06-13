@@ -50,4 +50,9 @@ describe("gradeAnswer", () => {
     expect(gradeAnswer(ex("DICTATION", "x"), "x").stub).toBe(true);
     expect(gradeAnswer(ex("PRONUNCIATION", "x"), "x").stub).toBe(true);
   });
+
+  it("WRITING/LISTENING: stub (não travam conclusão como o default)", () => {
+    expect(gradeAnswer(ex("WRITING", "x"), "x").stub).toBe(true);
+    expect(gradeAnswer(ex("LISTENING", "x"), "x").stub).toBe(true);
+  });
 });

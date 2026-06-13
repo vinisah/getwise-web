@@ -16,7 +16,7 @@ export function expiresIn(hours = 24): Date {
   return new Date(Date.now() + hours * 60 * 60 * 1000);
 }
 
-/** Código humano de certificado: GW-XXXXXX (6 hex maiúsculo). */
+/** Código de certificado: GW-XXXXXXXXXXXX (12 hex maiúsculo = 6 bytes). */
 export function createCertificateCode(): string {
-  return "GW-" + randomBytes(3).toString("hex").toUpperCase();
+  return "GW-" + randomBytes(6).toString("hex").toUpperCase();
 }

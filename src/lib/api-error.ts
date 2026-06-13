@@ -45,6 +45,10 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
           return NextResponse.json({ error: "Referência inválida" }, { status: 400 });
         }
       }
+      // Entrada malformada que escapou do Zod (enum/campo/tipo) → 400, não 500.
+      if (err instanceof Prisma.PrismaClientValidationError) {
+        return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
+      }
       // Falha loud no servidor: loga o erro real
       console.error("[API ERROR]", req.method, req.nextUrl.pathname, err);
       const message =

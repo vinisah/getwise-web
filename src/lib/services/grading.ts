@@ -64,8 +64,12 @@ export function gradeAnswer(exercise: ExerciseLike, answer: unknown): GradeResul
       return { isCorrect: passed, scorePercent, passed };
     }
 
+    // Tipos sem correção automática (voz/redação) → stub: não travam conclusão
+    // como o default fazia (front trata stub:true; não marca como "errado").
     case "DICTATION":
     case "PRONUNCIATION":
+    case "WRITING":
+    case "LISTENING":
       return { isCorrect: false, scorePercent: 0, passed: false, stub: true };
 
     default:

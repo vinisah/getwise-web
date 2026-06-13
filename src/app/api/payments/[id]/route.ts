@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { withErrorHandler } from "@/lib/api-error";
 import { requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
@@ -8,10 +9,19 @@ import { prisma } from "@/lib/prisma";
 
 type Ctx = { params: Promise<{ id: string }> };
 
+/** Dias de atraso contados em dias-calendário de Brasília (UTC−3). */
+function daysOverdueBrasilia(dueDate: Date, now: number): number {
+  const dayMs = 86_400_000;
+  const offset = 3 * 3_600_000;
+  const dueDay = Math.floor((dueDate.getTime() - offset) / dayMs);
+  const nowDay = Math.floor((now - offset) / dayMs);
+  return nowDay - dueDay;
+}
+
 /**
  * PATCH /api/payments/[id] — marcar mensalidade paga/pendente.
- * PAID → grava paidAt + cria receita no financeiro (idempotente via reference).
- * PENDING → limpa paidAt + remove a receita correspondente.
+ * PAID → grava paidAt + amountPaid (com multa/juros) + receita idempotente (reference @unique).
+ * PENDING → limpa paidAt/amountPaid + remove a receita.
  */
 export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
   const session = await requireAdmin();
@@ -32,20 +42,22 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
   const reference = `payment:${id}`;
   const ref = `${String(payment.month).padStart(2, "0")}/${payment.year}`;
 
-  // Multa 2% + juros 1% a.m. pro-rata se vencida (calculado no momento da baixa).
-  const daysOverdue = Math.floor((Date.now() - payment.dueDate.getTime()) / 86_400_000);
-  const charges = calcLateCharges(payment.amount, daysOverdue);
-  const hasCharges = charges.total > payment.amount;
+  if (status === "PAID") {
+    // Já paga → no-op idempotente (não recalcula juros nem duplica receita).
+    if (payment.status === "PAID" && payment.amountPaid != null) {
+      return NextResponse.json(payment);
+    }
+    const days = daysOverdueBrasilia(payment.dueDate, Date.now());
+    const charges = calcLateCharges(payment.amount, days);
+    const hasCharges = charges.total > payment.amount;
 
-  const updated = await prisma.$transaction(async (tx) => {
-    if (status === "PAID") {
+    const updated = await prisma.$transaction(async (tx) => {
       const up = await tx.payment.update({
         where: { id },
-        data: { status: "PAID", paidAt: new Date(), ...(method ? { method } : {}) },
+        data: { status: "PAID", paidAt: new Date(), amountPaid: charges.total, ...(method ? { method } : {}) },
       });
-      // Idempotente: só cria a receita se ainda não existe.
-      const existing = await tx.financialTransaction.findFirst({ where: { reference } });
-      if (!existing) {
+      // Receita idempotente: reference é @unique → P2002 = já existe (no-op).
+      try {
         await tx.financialTransaction.create({
           data: {
             type: "INCOME",
@@ -59,13 +71,21 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
             createdBy: session.user.id,
           },
         });
+      } catch (e) {
+        if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
       }
       return up;
-    }
-    // Volta a PENDENTE: remove a receita vinculada.
+    });
+
+    await audit({ userId: session.user.id, action: "PAYMENT_UPDATED", entity: "Payment", entityId: id, payload: { status, amountPaid: charges.total } });
+    return NextResponse.json(updated);
+  }
+
+  // Volta a PENDENTE: limpa baixa + remove a receita vinculada.
+  const updated = await prisma.$transaction(async (tx) => {
     const up = await tx.payment.update({
       where: { id },
-      data: { status: "PENDING", paidAt: null },
+      data: { status: "PENDING", paidAt: null, amountPaid: null },
     });
     await tx.financialTransaction.deleteMany({ where: { reference } });
     return up;

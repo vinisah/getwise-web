@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useEffect } from "react";
+import { useMobileNav } from "@/components/dashboard/mobile-nav";
 import { cx, getInitials } from "@/lib/utils";
 import { Logo } from "@/components/gw/logo";
 import { Avatar } from "@/components/gw/primitives";
@@ -78,24 +80,32 @@ function isActive(pathname: string, href: string) {
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { open, setOpen } = useMobileNav();
   const user = session?.user as { name?: string; email?: string; role?: string } | undefined;
   const role = user?.role || "STUDENT";
   const nav = NAV[role] || NAV.STUDENT;
 
-  return (
-    <aside className="gw-sidebar">
-      <div className="gw-side-brand">
-        <Logo variant="full" white height={26} />
-      </div>
+  // Fecha o drawer ao trocar de rota (navegação no mobile).
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname, setOpen]);
 
-      <nav className="gw-nav-list">
-        {nav.map((item, i) =>
-          "section" in item ? (
-            <div key={"s" + i} className="gw-nav-section">
-              {item.section}
-            </div>
-          ) : (
-            <Link key={item.id} href={item.href} className={cx("gw-nav", isActive(pathname, item.href) && "active")}>
+  return (
+    <>
+      {open && <div className="gw-backdrop" onClick={() => setOpen(false)} />}
+      <aside className={cx("gw-sidebar", open && "gw-open")}>
+        <div className="gw-side-brand">
+          <Logo variant="full" white height={26} />
+        </div>
+
+        <nav className="gw-nav-list">
+          {nav.map((item, i) =>
+            "section" in item ? (
+              <div key={"s" + i} className="gw-nav-section">
+                {item.section}
+              </div>
+            ) : (
+              <Link key={item.id} href={item.href} onClick={() => setOpen(false)} className={cx("gw-nav", isActive(pathname, item.href) && "active")}>
               <item.icon size={19} strokeWidth={isActive(pathname, item.href) ? 2 : 1.7} />
               <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
               {item.badge && (
@@ -140,6 +150,7 @@ export function Sidebar() {
           </div>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

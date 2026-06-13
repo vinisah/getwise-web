@@ -24,4 +24,8 @@ describe("isUnitUnlocked (sequencial)", () => {
     expect(isUnitUnlocked("u3", ordered, new Set(["u1"]))).toBe(false);
     expect(isUnitUnlocked("u3", ordered, new Set(["u1", "u2"]))).toBe(true);
   });
+
+  it("unidade fora da ordenação (idx=-1) → bloqueada (seguro por padrão)", () => {
+    expect(isUnitUnlocked("fantasma", ordered, new Set(["u1", "u2", "u3"]))).toBe(false);
+  });
 });

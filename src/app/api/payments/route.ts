@@ -47,6 +47,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       enrollment: { include: { plan: { select: { name: true } } } },
     },
     orderBy: { dueDate: "asc" },
+    take: 2000, // cap de segurança (paginação real fica p/ quando o volume exigir)
   });
 
   const now = new Date();

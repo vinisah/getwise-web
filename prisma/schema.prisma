@@ -241,10 +241,12 @@ model Enrollment {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  student  User      @relation(fields: [studentId], references: [id])
-  plan     Plan      @relation(fields: [planId], references: [id])
+  student  User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  plan     Plan      @relation(fields: [planId], references: [id]) // Restrict: não apagar plano com matrículas
   payments Payment[]
 
+  @@index([studentId])
+  @@index([planId])
   @@map("enrollments")
 }
 
@@ -265,11 +267,12 @@ model Lesson {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  teacher   User             @relation(fields: [teacherId], references: [id])
+  teacher   User             @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   bookings  LessonBooking[]
   materials LessonMaterial[]
   exercises Exercise[]
 
+  @@index([teacherId])
   @@map("lessons")
 }
 
@@ -284,10 +287,11 @@ model LessonBooking {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  lesson  Lesson @relation(fields: [lessonId], references: [id])
-  student User   @relation(fields: [studentId], references: [id])
+  lesson  Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([lessonId, studentId])
+  @@index([studentId])
   @@map("lesson_bookings")
 }
 
@@ -306,7 +310,7 @@ model LessonMaterial {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  lesson Lesson? @relation(fields: [lessonId], references: [id])
+  lesson Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
   @@map("lesson_materials")
 }
@@ -352,8 +356,8 @@ model ExerciseAttempt {
   timeSpent   Int?
   createdAt   DateTime @default(now())
 
-  exercise Exercise @relation(fields: [exerciseId], references: [id])
-  student  User     @relation(fields: [studentId], references: [id])
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  student  User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId, exerciseId])
   @@map("exercise_attempts")
@@ -368,9 +372,10 @@ model ChatSession {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  student  User          @relation(fields: [studentId], references: [id])
+  student  User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
   messages ChatMessage[]
 
+  @@index([studentId])
   @@map("chat_sessions")
 }
 
@@ -415,7 +420,7 @@ model FinancialTransaction {
   paidAt        DateTime?
   paymentMethod PaymentMethod?
   isRecurring   Boolean         @default(false) // despesa/receita que repete todo mês
-  reference     String?
+  reference     String?         @unique // idempotência (payment:<id>, salary:<id>, recurring:<src>:<MM/YYYY>)
   notes         String?         @db.Text
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
@@ -424,6 +429,9 @@ model FinancialTransaction {
   category FinancialCategory? @relation(fields: [categoryId], references: [id])
   creator  User?              @relation(fields: [createdBy], references: [id])
 
+  @@index([date, isPaid, type])
+  @@index([categoryId])
+  @@index([createdBy])
   @@map("financial_transactions")
 }
 
@@ -465,9 +473,10 @@ model SalaryPayment {
   notes       String?
   createdAt   DateTime          @default(now())
 
-  employee Employee @relation(fields: [employeeId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([employeeId, month, year, type])
+  @@index([employeeId])
   @@map("salary_payments")
 }
 
@@ -477,7 +486,8 @@ model Payment {
   id             String        @id @default(cuid())
   enrollmentId   String?
   studentId      String
-  amount         Int           // centavos (1999 = R$ 19,99)
+  amount         Int           // centavos — valor da mensalidade (sem multa)
+  amountPaid     Int?          // centavos — valor efetivamente recebido (c/ multa+juros); null = não pago
   status         PaymentStatus @default(PENDING)
   method         PaymentMethod?
   mercadoPagoId  String?       @unique
@@ -491,8 +501,11 @@ model Payment {
   updatedAt      DateTime      @updatedAt
 
   enrollment Enrollment? @relation(fields: [enrollmentId], references: [id])
-  student    User        @relation(fields: [studentId], references: [id])
+  student    User        @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
+  @@index([status, dueDate])
+  @@index([studentId])
+  @@index([enrollmentId])
   @@map("payments")
 }
 
@@ -655,10 +668,11 @@ model Certificate {
   completionDate DateTime
   createdAt      DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   course Course @relation(fields: [courseId], references: [id])
 
   @@unique([userId, courseId])
+  @@index([courseId])
   @@map("certificates")
 }
 

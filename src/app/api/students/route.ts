@@ -78,6 +78,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       enrollments: { where: { status: "ACTIVE" }, include: { plan: true } },
     },
     orderBy: { name: "asc" },
+    take: 1000, // cap de segurança
   });
 
   return NextResponse.json(students);

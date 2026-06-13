@@ -36,7 +36,7 @@ export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
     planName: payment.enrollment?.plan.name ?? null,
     month: payment.month,
     year: payment.year,
-    amount: payment.amount,
+    amount: payment.amountPaid ?? payment.amount, // valor efetivamente recebido (c/ multa/juros)
     paidAt: payment.paidAt,
     method: payment.method,
   });

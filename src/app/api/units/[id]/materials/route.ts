@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withErrorHandler } from "@/lib/api-error";
+import { ApiError, withErrorHandler } from "@/lib/api-error";
 import { requireAuth, requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
+import { CreateMaterialSchema } from "@/lib/schemas";
+import { canAccessUnit } from "@/lib/services/unlock";
 import { prisma } from "@/lib/prisma";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 /** GET /api/units/[id]/materials — lista materiais (PDF) da unidade. */
 export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
-  await requireAuth();
+  const session = await requireAuth();
   const { id: unitId } = await (ctx as Ctx).params;
+
+  // Aluno só vê materiais de unidade desbloqueada (gate).
+  if (session.user.role === "STUDENT" && !(await canAccessUnit(session.user.id, unitId))) {
+    throw new ApiError(403, "Unidade bloqueada");
+  }
 
   const materials = await prisma.unitMaterial.findMany({
     where: { unitId },
@@ -24,15 +31,14 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx) => {
   const session = await requireAdmin();
   const { id: unitId } = await (ctx as Ctx).params;
 
-  const body = await req.json();
-  const fileName = String(body.fileName ?? "").trim();
-  const fileUrl = String(body.fileUrl ?? "").trim();
-  if (!fileName || !fileUrl) {
-    return NextResponse.json({ error: "Nome e URL do arquivo são obrigatórios" }, { status: 400 });
+  const parsed = CreateMaterialSchema.omit({ unitId: true }).safeParse(await req.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
   }
+  const { fileName, fileUrl, fileType } = parsed.data;
 
   const material = await prisma.unitMaterial.create({
-    data: { unitId, fileName, fileUrl, fileType: String(body.fileType ?? "pdf") },
+    data: { unitId, fileName, fileUrl, fileType },
   });
 
   await audit({ userId: session.user.id, action: "CREATE_UNIT", entity: "UnitMaterial", entityId: material.id });

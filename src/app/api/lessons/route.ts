@@ -1,18 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { withErrorHandler } from "@/lib/api-error";
 import { requireAuth } from "@/lib/api-auth";
 import { ApiError } from "@/lib/api-error";
 import { audit } from "@/lib/audit";
 import { CreateLessonSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+
+const LessonStatusEnum = z.enum(["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]);
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const session = await requireAuth();
 
   const { searchParams } = new URL(req.url);
-  const status = searchParams.get("status");
+  const rawStatus = searchParams.get("status");
+  let status: z.infer<typeof LessonStatusEnum> | undefined;
+  if (rawStatus) {
+    const r = LessonStatusEnum.safeParse(rawStatus);
+    if (!r.success) return NextResponse.json({ error: "Status inválido" }, { status: 400 });
+    status = r.data;
+  }
 
-  let where: any = {};
+  let where: Prisma.LessonWhereInput = {};
 
   if (session.user.role === "STUDENT") {
     where = {
@@ -59,9 +69,20 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const { teacherId, title, description, scheduledAt, duration, meetingUrl, level, maxStudents, studentIds } = parsed.data;
 
+  // TEACHER só cria aula em seu próprio nome; ADMIN pode designar outro professor.
+  const finalTeacherId = session.user.role === "ADMIN" ? (teacherId ?? session.user.id) : session.user.id;
+
+  // Valida que todos os studentIds são alunos existentes (evita IDOR/lixo).
+  if (studentIds?.length) {
+    const validCount = await prisma.user.count({ where: { id: { in: studentIds }, role: "STUDENT" } });
+    if (validCount !== studentIds.length) {
+      throw new ApiError(400, "Um ou mais alunos são inválidos");
+    }
+  }
+
   const lesson = await prisma.lesson.create({
     data: {
-      teacherId: teacherId ?? session.user.id,
+      teacherId: finalTeacherId,
       title,
       description: description || null,
       scheduledAt: new Date(scheduledAt),

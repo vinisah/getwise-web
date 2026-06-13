@@ -61,7 +61,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: { mo
         </p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--gap)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--gap)" }}>
         {cards.map((c) => (
           <Card key={c.label}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>

@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { createCertificateCode } from "../tokens";
 
@@ -19,24 +20,36 @@ export async function issueCertificate(params: IssueParams) {
   });
   if (existing) return existing;
 
-  // Gera código único (retry em colisão — extremamente raro)
-  let certificateId = createCertificateCode();
-  for (let i = 0; i < 5; i++) {
-    const clash = await prisma.certificate.findUnique({ where: { certificateId } });
-    if (!clash) break;
-    certificateId = createCertificateCode();
+  // Gera código único com retry no próprio create (cobre a race entre check e insert).
+  for (let i = 0; i < 6; i++) {
+    try {
+      return await prisma.certificate.create({
+        data: {
+          certificateId: createCertificateCode(),
+          userId: params.userId,
+          courseId: params.courseId,
+          studentName: params.studentName,
+          courseName: params.courseName,
+          completionDate: new Date(),
+        },
+      });
+    } catch (e) {
+      // P2002 em certificateId → colisão de código: tenta de novo.
+      // P2002 em [userId,courseId] → já emitido concorrentemente: retorna o existente.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const target = (e.meta?.target as string[] | undefined)?.join(",") ?? "";
+        if (target.includes("userId") || target.includes("courseId")) {
+          const existing = await prisma.certificate.findUnique({
+            where: { userId_courseId: { userId: params.userId, courseId: params.courseId } },
+          });
+          if (existing) return existing;
+        }
+        continue; // colisão de certificateId → novo código
+      }
+      throw e;
+    }
   }
-
-  return prisma.certificate.create({
-    data: {
-      certificateId,
-      userId: params.userId,
-      courseId: params.courseId,
-      studentName: params.studentName,
-      courseName: params.courseName,
-      completionDate: new Date(),
-    },
-  });
+  throw new Error("Falha ao gerar código único de certificado");
 }
 
 interface CertData {

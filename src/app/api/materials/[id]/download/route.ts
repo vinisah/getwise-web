@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withErrorHandler } from "@/lib/api-error";
+import { ApiError, withErrorHandler } from "@/lib/api-error";
 import { requireAuth } from "@/lib/api-auth";
+import { canAccessUnit } from "@/lib/services/unlock";
 import { prisma } from "@/lib/prisma";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -15,6 +16,11 @@ export const POST = withErrorHandler(async (_req: NextRequest, ctx) => {
 
   const material = await prisma.unitMaterial.findUnique({ where: { id: materialId } });
   if (!material) return NextResponse.json({ error: "Material não encontrado" }, { status: 404 });
+
+  // Aluno só baixa material de unidade desbloqueada (gate).
+  if (session.user.role === "STUDENT" && !(await canAccessUnit(session.user.id, material.unitId))) {
+    throw new ApiError(403, "Unidade bloqueada");
+  }
 
   await prisma.materialDownload.upsert({
     where: { userId_materialId: { userId: session.user.id, materialId } },

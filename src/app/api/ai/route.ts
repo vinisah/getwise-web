@@ -3,6 +3,7 @@ import { withErrorHandler } from "@/lib/api-error";
 import { requireAuth } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 import { AiMessageSchema } from "@/lib/schemas";
+import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 import OpenAI from "openai";
 
@@ -56,6 +57,12 @@ Keep responses concise and engaging. Use examples, exercises, and real-world con
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const session = await requireAuth();
+
+  // Anti-abuso de custo: limita chamadas pagas à Groq por usuário.
+  const { allowed, retryAfter } = checkRateLimit(`ai:${session.user.id}`, LIMITS.AI_CHAT.max, LIMITS.AI_CHAT.windowMs);
+  if (!allowed) {
+    return NextResponse.json({ error: `Muitas mensagens. Aguarde ${retryAfter}s.` }, { status: 429 });
+  }
 
   const parsed = AiMessageSchema.safeParse(await req.json());
   if (!parsed.success) {

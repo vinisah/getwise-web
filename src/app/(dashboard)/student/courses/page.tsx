@@ -43,7 +43,8 @@ export default async function StudentCoursesPage() {
     const unlocked = c.prerequisites.every((p) => certSet.has(p.requiredCourseId));
     const total = totalUnits.get(c.id) ?? 0;
     const done = completedCount.get(c.id) ?? 0;
-    const progress = total ? Math.round((done / total) * 100) : 0;
+    // clamp 0-100 (progresso órfão não estoura a barra)
+    const progress = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
     return { course: c, unlocked, progress };
   });
 

@@ -1,16 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { withErrorHandler } from "@/lib/api-error";
 import { requireAuth } from "@/lib/api-auth";
 import { ApiError } from "@/lib/api-error";
 import { CreateExerciseSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 
+const LevelEnum = z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]);
+const TypeEnum = z.enum(["MULTIPLE_CHOICE", "FILL_IN_BLANK", "TRUE_FALSE", "WRITING", "LISTENING", "WORD_MATCH", "TRANSLATION", "SENTENCE_ORDER", "DICTATION", "PRONUNCIATION"]);
+
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const session = await requireAuth();
 
   const { searchParams } = new URL(req.url);
-  const level = searchParams.get("level");
-  const type = searchParams.get("type");
+  const rawLevel = searchParams.get("level");
+  const rawType = searchParams.get("type");
+
+  // Valida enums da query → 400 (em vez de repassar lixo ao Prisma = 500).
+  let level: z.infer<typeof LevelEnum> | undefined;
+  if (rawLevel) {
+    const r = LevelEnum.safeParse(rawLevel);
+    if (!r.success) return NextResponse.json({ error: "Nível inválido" }, { status: 400 });
+    level = r.data;
+  }
+  let type: z.infer<typeof TypeEnum> | undefined;
+  if (rawType) {
+    const r = TypeEnum.safeParse(rawType);
+    if (!r.success) return NextResponse.json({ error: "Tipo inválido" }, { status: 400 });
+    type = r.data;
+  }
 
   const profile = session.user.role === "STUDENT"
     ? await prisma.studentProfile.findUnique({ where: { userId: session.user.id } })
@@ -19,8 +37,8 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const exercises = await prisma.exercise.findMany({
     where: {
       isActive: true,
-      ...(level ? { level: level as any } : profile ? { level: profile.level } : {}),
-      ...(type ? { type: type as any } : {}),
+      ...(level ? { level } : profile ? { level: profile.level } : {}),
+      ...(type ? { type } : {}),
     },
     orderBy: { createdAt: "desc" },
   });

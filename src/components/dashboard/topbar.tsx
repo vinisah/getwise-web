@@ -3,7 +3,8 @@
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { Eyebrow } from "@/components/gw/primitives";
-import { Search, Bell, LogOut } from "lucide-react";
+import { useMobileNav } from "@/components/dashboard/mobile-nav";
+import { Search, Bell, LogOut, Menu } from "lucide-react";
 
 const TITLES: Record<string, { title: string; sub?: string }> = {
   "/admin": { title: "Dashboard", sub: "Visão geral do mês" },
@@ -30,6 +31,7 @@ const TITLES: Record<string, { title: string; sub?: string }> = {
 export function Topbar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { setOpen } = useMobileNav();
   const role = (session?.user as { role?: string } | undefined)?.role || "STUDENT";
 
   const meta = TITLES[pathname] || { title: "Get Wise" };
@@ -38,10 +40,15 @@ export function Topbar() {
 
   return (
     <header className="gw-topbar">
-      <div>
-        <Eyebrow>{eyebrow}</Eyebrow>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--ink)", letterSpacing: "-.025em", marginTop: 3 }}>{meta.title}</h1>
-        {meta.sub && <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{meta.sub}</p>}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button className="gw-burger" onClick={() => setOpen(true)} aria-label="Abrir menu">
+          <Menu size={22} />
+        </button>
+        <div>
+          <Eyebrow>{eyebrow}</Eyebrow>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--ink)", letterSpacing: "-.025em", marginTop: 3 }}>{meta.title}</h1>
+          {meta.sub && <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{meta.sub}</p>}
+        </div>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

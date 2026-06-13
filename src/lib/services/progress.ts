@@ -112,13 +112,3 @@ export async function touchUnitAccess(userId: string, unitId: string, courseId: 
   });
 }
 
-/**
- * % concluído de um curso para um usuário.
- */
-export async function getCourseProgress(userId: string, courseId: string): Promise<number> {
-  const ordered = await getOrderedUnits(courseId);
-  if (ordered.length === 0) return 0;
-  const completed = await getCompletedUnitIds(userId, courseId);
-  const doneCount = ordered.filter((u) => completed.has(u.id)).length;
-  return Math.round((doneCount / ordered.length) * 100);
-}

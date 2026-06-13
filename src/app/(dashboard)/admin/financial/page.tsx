@@ -61,7 +61,7 @@ export default async function FinancialPage({ searchParams }: { searchParams: { 
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--gap)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--gap)" }}>
         {summary.map((s) => (
           <Card key={s.label} style={{ borderLeft: `4px solid ${s.border}` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>

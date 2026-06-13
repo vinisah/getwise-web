@@ -58,10 +58,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(400, "Desconto maior que o valor do plano");
   }
 
-  const start = new Date(startDate);
-  // Mês/ano da 1ª cobrança a partir da string "YYYY-MM-DD" (sem deslocamento de timezone).
-  const startYear = Number(startDate.slice(0, 4));
-  const startMonth = Number(startDate.slice(5, 7));
+  const start = new Date(startDate); // já validado como data parseável no schema
+  // Mês/ano da 1ª cobrança: preferir os componentes ISO (sem deslocamento de TZ),
+  // com fallback seguro p/ outros formatos válidos (evita NaN).
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(startDate);
+  const startYear = iso ? Number(iso[1]) : start.getUTCFullYear();
+  const startMonth = iso ? Number(iso[2]) : start.getUTCMonth() + 1;
   const monthlyAmount = plan.price - discount; // centavos
 
   // Atômico: cria a matrícula + a 1ª mensalidade PENDENTE (registro interno; sem Mercado Pago).

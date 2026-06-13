@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-error";
+import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
-import { audit } from "@/lib/audit";
+import { audit, getClientIp } from "@/lib/audit";
 
 /**
  * GET /api/auth/verify-email?token=...
@@ -10,6 +11,13 @@ import { audit } from "@/lib/audit";
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const token = req.nextUrl.searchParams.get("token");
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+  // Anti-brute-force de token (por IP).
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(`verify:${ip}`, LIMITS.API_WRITE.max, LIMITS.API_WRITE.windowMs);
+  if (!rl.allowed) {
+    return NextResponse.redirect(`${appUrl}/login?verify=ratelimited`);
+  }
 
   if (!token) {
     return NextResponse.redirect(`${appUrl}/login?verify=invalid`);

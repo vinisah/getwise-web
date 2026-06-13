@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { withErrorHandler } from "@/lib/api-error";
 import { requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
@@ -8,8 +9,8 @@ import { prisma } from "@/lib/prisma";
 
 /**
  * POST /api/financial/recurring — gera as transações recorrentes do mês alvo
- * clonando as marcadas isRecurring do mês ANTERIOR. Idempotente: não duplica
- * (dedupe por descrição no mês alvo). Clones nascem não-pagos.
+ * clonando as marcadas isRecurring do mês ANTERIOR. Idempotente via `reference`
+ * estável (`recurring:<sourceId>:<MM/YYYY>` + @unique) — re-rodar não duplica.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const session = await requireAdmin();
@@ -23,48 +24,42 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // Mês anterior (com virada de ano).
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
-
   const prevRange = monthRangeBrasilia(prevYear, prevMonth);
-  const targetRange = monthRangeBrasilia(year, month);
 
-  const [sources, existing] = await Promise.all([
-    prisma.financialTransaction.findMany({
-      where: { isRecurring: true, date: { gte: prevRange.gte, lte: prevRange.lte } },
-    }),
-    prisma.financialTransaction.findMany({
-      where: { date: { gte: targetRange.gte, lte: targetRange.lte } },
-      select: { description: true },
-    }),
-  ]);
+  const sources = await prisma.financialTransaction.findMany({
+    where: { isRecurring: true, date: { gte: prevRange.gte, lte: prevRange.lte } },
+  });
 
-  const existingDescriptions = new Set(existing.map((t) => t.description));
-  const toCreate = sources.filter((s) => !existingDescriptions.has(s.description));
-
-  // Mesmo dia do mês, limitado ao último dia do mês alvo. Datas em UTC−3 (Brasília).
+  const ref = `${String(month).padStart(2, "0")}/${year}`;
   const lastDayOfTarget = new Date(Date.UTC(year, month, 0)).getUTCDate();
 
-  // Cria tudo numa única transação (atômico + 1 ida ao banco em vez de N).
-  await prisma.$transaction(
-    toCreate.map((s) => {
-      const day = Math.min(s.date.getUTCDate(), lastDayOfTarget);
-      return prisma.financialTransaction.create({
+  let created = 0;
+  for (const s of sources) {
+    const day = Math.min(s.date.getUTCDate(), lastDayOfTarget);
+    const date = new Date(Date.UTC(year, month - 1, day, 3, 0, 0));
+    try {
+      await prisma.financialTransaction.create({
         data: {
           type: s.type,
           amount: s.amount,
           description: s.description,
-          date: new Date(Date.UTC(year, month - 1, day, 3, 0, 0)),
-          dueDate: s.dueDate ? new Date(Date.UTC(year, month - 1, day, 3, 0, 0)) : null,
+          date,
+          dueDate: s.dueDate ? date : null,
           categoryId: s.categoryId,
           isPaid: false,
           isRecurring: true,
           paymentMethod: s.paymentMethod,
           notes: s.notes,
+          reference: `recurring:${s.id}:${ref}`, // dedupe estável (idempotente via @unique)
           createdBy: session.user.id,
         },
       });
-    })
-  );
-  const created = toCreate.length;
+      created += 1;
+    } catch (e) {
+      // P2002 = já gerada para este mês → pula (idempotente).
+      if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
+    }
+  }
 
   await audit({ userId: session.user.id, action: "GENERATE_RECURRING", entity: "FinancialTransaction", payload: { month, year, created, skipped: sources.length - created } });
 

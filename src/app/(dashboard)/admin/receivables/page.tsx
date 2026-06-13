@@ -71,7 +71,7 @@ export default async function ReceivablesPage({ searchParams }: { searchParams: 
         </p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--gap)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--gap)" }}>
         {BUCKETS.map((b) => (
           <Card key={b.key} style={{ borderLeft: `4px solid ${aging[b.key].count > 0 ? "var(--danger)" : "var(--line)"}` }}>
             <div style={{ fontSize: 12.5, color: "var(--muted)", fontWeight: 600, marginBottom: 6 }}>

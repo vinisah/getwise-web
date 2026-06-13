@@ -49,7 +49,8 @@ export function isUnitUnlocked(
   completed: Set<string>
 ): boolean {
   const idx = ordered.findIndex((u) => u.id === unitId);
-  if (idx <= 0) return true; // primeira (ou não encontrada → permissiva no topo)
+  if (idx === -1) return false; // não pertence ao curso/ordenação → negar (seguro por padrão)
+  if (idx === 0) return true; // primeira unidade sempre liberada
   const prev = ordered[idx - 1];
   return completed.has(prev.id);
 }
@@ -71,4 +72,23 @@ export async function isCourseUnlocked(userId: string, courseId: string): Promis
   });
   const done = new Set(certs.map((c) => c.courseId));
   return prereqs.every((p) => done.has(p.requiredCourseId));
+}
+
+/**
+ * Aluno pode acessar o conteúdo da unidade? (curso desbloqueado E unidade desbloqueada).
+ * Centraliza o gate usado nas rotas de conteúdo/material.
+ */
+export async function canAccessUnit(userId: string, unitId: string): Promise<boolean> {
+  const unit = await prisma.unit.findUnique({
+    where: { id: unitId },
+    select: { module: { select: { courseId: true } } },
+  });
+  if (!unit) return false;
+  const courseId = unit.module.courseId;
+  const [courseUnlocked, ordered, completed] = await Promise.all([
+    isCourseUnlocked(userId, courseId),
+    getOrderedUnits(courseId),
+    getCompletedUnitIds(userId, courseId),
+  ]);
+  return courseUnlocked && isUnitUnlocked(unitId, ordered, completed);
 }
