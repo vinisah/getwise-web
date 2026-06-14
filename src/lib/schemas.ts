@@ -18,6 +18,13 @@ const BrlAmount = z.coerce
 const DateString = z.string().min(1, "Data obrigatória").refine((v) => !Number.isNaN(Date.parse(v)), "Data inválida");
 const OptionalDateString = z.string().refine((v) => v === "" || !Number.isNaN(Date.parse(v)), "Data inválida").optional();
 
+// URL opcional para links coláveis: aceita vazio, prefixa https:// quando o usuário omite o
+// scheme (ex.: "youtube.com/..."), e exige http(s) (bloqueia javascript:/ftp:/etc.).
+const OptionalUrl = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() && !/^[a-z][a-z0-9+.-]*:\/\//i.test(v.trim()) ? `https://${v.trim()}` : v),
+  z.string().url().refine((u) => /^https?:\/\//i.test(u), "URL deve começar com http(s)").optional().or(z.literal(""))
+);
+
 // ─── Alunos ──────────────────────────────────────────────────────────────────
 
 export const CreateStudentSchema = z.object({
@@ -312,8 +319,8 @@ export const CreateUnitSchema = z.object({
   title: z.string().min(2).max(200),
   content: z.string().max(50_000).default(""),
   type: z.enum(["READING", "VIDEO", "MIXED"]).default("READING"),
-  videoUrl: z.string().url().optional().or(z.literal("")),
-  thumbnailUrl: z.string().url().optional().or(z.literal("")),
+  videoUrl: OptionalUrl,
+  thumbnailUrl: OptionalUrl,
   videoDurationSeconds: z.coerce.number().int().min(0).max(86400).optional(),
   durationMinutes: z.coerce.number().int().min(0).max(600).optional(),
   order: z.coerce.number().int().min(0).max(999).default(0),

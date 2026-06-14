@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
 import { Card, SectionHeader, Badge } from "@/components/gw/primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, BookOpen, Settings2 } from "lucide-react";
+import { Plus, Trash2, BookOpen, Settings2, UploadCloud } from "lucide-react";
 import { ExerciseEditor } from "./exercise-editor";
 
 interface ExEx { id: string; title: string; type: string; points: number; isRequired: boolean }
@@ -31,9 +32,31 @@ export function CourseEditor({ course, others }: { course: CourseData; others: O
   const [unitDrafts, setUnitDrafts] = useState<Record<string, { title: string; content: string }>>({});
   const [prereqSel, setPrereqSel] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [uploading, setUploading] = useState<string | null>(null);
 
   async function saveUnitConfig(unitId: string, type: string, videoUrl: string) {
     await call(`/api/units/${unitId}`, "PUT", { type, videoUrl });
+  }
+
+  /** Upload direto navegador→Vercel Blob; grava a URL pública no vídeo da unidade. */
+  async function uploadVideo(unitId: string, file: File) {
+    setUploading(unitId);
+    try {
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+        contentType: file.type,
+      });
+      const input = document.getElementById(`video-${unitId}`) as HTMLInputElement | null;
+      if (input) input.value = blob.url;
+      const cur = (document.getElementById(`type-${unitId}`) as HTMLSelectElement).value;
+      const finalType = cur === "READING" ? "VIDEO" : cur; // arquivo enviado → vira VIDEO
+      await saveUnitConfig(unitId, finalType, blob.url);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Falha no upload. O Blob store está configurado (BLOB_READ_WRITE_TOKEN)?");
+    } finally {
+      setUploading(null);
+    }
   }
 
   async function call(url: string, method: string, body?: unknown) {
@@ -129,14 +152,20 @@ export function CourseEditor({ course, others }: { course: CourseData; others: O
                 {expanded[u.id] && (
                   <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
                     {/* Config de vídeo/tipo */}
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4, flexWrap: "wrap" }}>
                       <select defaultValue={u.type} id={`type-${u.id}`} style={{ height: 36, borderRadius: 8, border: "1px solid var(--line)", padding: "0 10px", fontSize: 13, background: "var(--card)" }}>
                         <option value="READING">Leitura</option>
                         <option value="VIDEO">Vídeo</option>
                         <option value="MIXED">Vídeo + Leitura</option>
                       </select>
-                      <Input id={`video-${u.id}`} defaultValue={u.videoUrl ?? ""} placeholder="URL do vídeo (mp4)" style={{ flex: 1 }} />
-                      <Button variant="outline" size="sm" disabled={busy} onClick={() => {
+                      <Input id={`video-${u.id}`} defaultValue={u.videoUrl ?? ""} placeholder="Link (YouTube, Vimeo, mp4...) ou faça upload" style={{ flex: 1, minWidth: 220 }} />
+                      <input id={`file-${u.id}`} type="file" accept="video/*" style={{ display: "none" }}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVideo(u.id, f); e.currentTarget.value = ""; }} />
+                      <Button variant="outline" size="sm" disabled={busy || uploading === u.id}
+                        onClick={() => document.getElementById(`file-${u.id}`)?.click()} title="Enviar arquivo de vídeo">
+                        <UploadCloud size={15} /> {uploading === u.id ? "Enviando..." : "Upload"}
+                      </Button>
+                      <Button variant="outline" size="sm" disabled={busy || uploading === u.id} onClick={() => {
                         const t = (document.getElementById(`type-${u.id}`) as HTMLSelectElement).value;
                         const v = (document.getElementById(`video-${u.id}`) as HTMLInputElement).value;
                         saveUnitConfig(u.id, t, v);

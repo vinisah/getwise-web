@@ -8,7 +8,10 @@ export async function proxy(req: NextRequest) {
 
   const isRoot = pathname === "/";
   const isProtected = AUTH_PATHS.some((p) => pathname.startsWith(p));
-  const isApiProtected = pathname.startsWith("/api/") && !pathname.startsWith("/api/auth");
+  // /api/upload faz a própria auth (handleUpload do Blob): a fase de callback do Blob
+  // é server-to-server sem cookie, então não pode ser barrada aqui.
+  const isApiProtected =
+    pathname.startsWith("/api/") && !pathname.startsWith("/api/auth") && pathname !== "/api/upload";
 
   if (isRoot || isProtected || isApiProtected) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });

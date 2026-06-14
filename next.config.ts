@@ -5,11 +5,15 @@ import type { NextConfig } from "next";
 // Groq é server-side → connect-src restrito a 'self'. Fontes via next/font são self-hosted.
 const CSP_REPORT_ONLY = [
   "default-src 'self'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://*.blob.vercel-storage.com",
   "style-src 'self' 'unsafe-inline'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "font-src 'self' data:",
-  "connect-src 'self'",
+  // upload direto pro Vercel Blob
+  "connect-src 'self' https://*.blob.vercel-storage.com https://blob.vercel-storage.com",
+  // vídeo direto/upload (Blob) e player de embeds
+  "media-src 'self' blob: https://*.blob.vercel-storage.com",
+  "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com",
   "frame-ancestors 'self'",
   "base-uri 'self'",
   "form-action 'self'",
