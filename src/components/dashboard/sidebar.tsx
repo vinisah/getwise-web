@@ -25,7 +25,6 @@ import {
   Bot,
   BookOpen,
   Award,
-  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -95,7 +94,7 @@ export function Sidebar() {
       {open && <div className="gw-backdrop" onClick={() => setOpen(false)} />}
       <aside className={cx("gw-sidebar", open && "gw-open")}>
         <div className="gw-side-brand">
-          <Logo variant="full" white height={26} />
+          <Logo variant="full" white height={38} />
         </div>
 
         <nav className="gw-nav-list">
@@ -131,13 +130,6 @@ export function Sidebar() {
       </nav>
 
       <div className="gw-side-foot">
-        <div className="gw-side-card">
-          <Sparkles size={18} color="#fff" />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Get Wise Plus</div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,.6)" }}>Relatórios avançados</div>
-          </div>
-        </div>
         <div className="gw-side-user">
           <Avatar initials={getInitials(user?.name || "GW")} size={36} tone="seed" />
           <div style={{ flex: 1, minWidth: 0 }}>

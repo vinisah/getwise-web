@@ -16,11 +16,11 @@ const STATUS: Record<string, { label: string; tone: string }> = {
   COMPLETED: { label: "Concluída", tone: "slate" },
 };
 
-export default async function EnrollmentsPage({ searchParams }: { searchParams: { status?: string } }) {
+export default async function EnrollmentsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const session = await getServerSession(authOptions);
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
-  const statusFilter = searchParams?.status;
+  const statusFilter = (await searchParams)?.status;
   const enrollments = await prisma.enrollment.findMany({
     where: statusFilter ? { status: statusFilter as never } : {},
     include: { student: true, plan: true, payments: { orderBy: { dueDate: "desc" }, take: 1 } },

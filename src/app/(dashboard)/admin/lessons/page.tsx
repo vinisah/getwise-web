@@ -24,11 +24,11 @@ const LEVEL: Record<string, string> = {
   C2: "C2 — Proficiente",
 };
 
-export default async function LessonsPage({ searchParams }: { searchParams: { status?: string } }) {
+export default async function LessonsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const session = await getServerSession(authOptions);
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
-  const statusFilter = searchParams?.status;
+  const statusFilter = (await searchParams)?.status;
   const lessons = await prisma.lesson.findMany({
     where: statusFilter ? { status: statusFilter as never } : {},
     include: { teacher: true, bookings: { include: { student: true } } },

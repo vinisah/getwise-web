@@ -8,18 +8,19 @@ import { Button } from "@/components/ui/button";
 import { fmtCents } from "@/lib/money";
 import { monthRangeBrasilia } from "@/lib/utils";
 import { MonthYearQuerySchema } from "@/lib/schemas";
-import { Download } from "lucide-react";
+import { Download, FileBarChart } from "lucide-react";
 
 /**
  * DRE simplificado (regime de caixa): receitas e despesas PAGAS por categoria,
  * no mês selecionado + acumulado do ano.
  */
-export default async function DrePage({ searchParams }: { searchParams: { month?: string; year?: string } }) {
+export default async function DrePage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string }> }) {
   const session = await getServerSession(authOptions);
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
   const now = new Date();
-  const q = MonthYearQuerySchema.safeParse({ month: searchParams?.month, year: searchParams?.year });
+  const sp = await searchParams;
+  const q = MonthYearQuerySchema.safeParse({ month: sp?.month, year: sp?.year });
   const month = (q.success ? q.data.month : undefined) ?? now.getMonth() + 1;
   const year = (q.success ? q.data.year : undefined) ?? now.getFullYear();
 
@@ -114,30 +115,41 @@ export default async function DrePage({ searchParams }: { searchParams: { month?
         })}
       </div>
 
-      <Card pad={false}>
-        <table className="gw-table">
-          <thead>
-            <tr>
-              <th>Demonstrativo de Resultado</th>
-              <th style={{ textAlign: "right", textTransform: "capitalize" }}>{monthName}</th>
-              <th style={{ textAlign: "right" }}>Acumulado {year}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {section("Receitas", groups.INCOME, "+", "var(--success)")}
-            {section("(−) Despesas", groups.EXPENSE, "−", "var(--danger)")}
-            <tr style={{ borderTop: "2px solid var(--line)" }}>
-              <td style={{ fontWeight: 800, fontSize: 14.5, color: "var(--ink)" }}>= Resultado</td>
-              <td style={{ textAlign: "right", fontWeight: 800, fontSize: 14.5, color: incomeMonth - expenseMonth >= 0 ? "var(--success)" : "var(--danger)" }}>
-                {fmtCents(incomeMonth - expenseMonth)}
-              </td>
-              <td style={{ textAlign: "right", fontWeight: 800, fontSize: 14.5, color: incomeYear - expenseYear >= 0 ? "var(--success)" : "var(--danger)" }}>
-                {fmtCents(incomeYear - expenseYear)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </Card>
+      {groups.INCOME.size === 0 && groups.EXPENSE.size === 0 ? (
+        <Card style={{ textAlign: "center", padding: 48 }}>
+          <FileBarChart size={36} color="var(--muted)" style={{ margin: "0 auto 12px" }} />
+          <p style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)" }}>Sem lançamentos pagos em {monthName}</p>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>
+            O DRE mostra receitas e despesas <b>pagas</b> (regime de caixa). Marque mensalidades como pagas
+            ou registre despesas para popular o demonstrativo.
+          </p>
+        </Card>
+      ) : (
+        <Card pad={false}>
+          <table className="gw-table">
+            <thead>
+              <tr>
+                <th>Demonstrativo de Resultado</th>
+                <th style={{ textAlign: "right", textTransform: "capitalize" }}>{monthName}</th>
+                <th style={{ textAlign: "right" }}>Acumulado {year}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {section("Receitas", groups.INCOME, "+", "var(--success)")}
+              {section("(−) Despesas", groups.EXPENSE, "−", "var(--danger)")}
+              <tr style={{ borderTop: "2px solid var(--line)" }}>
+                <td style={{ fontWeight: 800, fontSize: 14.5, color: "var(--ink)" }}>= Resultado</td>
+                <td style={{ textAlign: "right", fontWeight: 800, fontSize: 14.5, color: incomeMonth - expenseMonth >= 0 ? "var(--success)" : "var(--danger)" }}>
+                  {fmtCents(incomeMonth - expenseMonth)}
+                </td>
+                <td style={{ textAlign: "right", fontWeight: 800, fontSize: 14.5, color: incomeYear - expenseYear >= 0 ? "var(--success)" : "var(--danger)" }}>
+                  {fmtCents(incomeYear - expenseYear)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </Card>
+      )}
     </div>
   );
 }

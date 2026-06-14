@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk, Spline_Sans_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -18,6 +18,10 @@ const spline = Spline_Sans_Mono({
 export const metadata: Metadata = {
   title: "Get Wise — Speak English",
   description: "Sistema de gestão de aulas de inglês Get Wise",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#16204E",
 };
 
 export default function RootLayout({

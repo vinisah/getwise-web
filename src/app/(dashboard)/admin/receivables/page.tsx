@@ -20,12 +20,13 @@ const BUCKETS = [
   { key: "90+", label: "+90 dias" },
 ] as const;
 
-export default async function ReceivablesPage({ searchParams }: { searchParams: { filter?: string } }) {
+export default async function ReceivablesPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const session = await getServerSession(authOptions);
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
-  const filter: Filter = (["ALL", "PENDING", "OVERDUE", "PAID"] as const).includes(searchParams?.filter as Filter)
-    ? (searchParams!.filter as Filter)
+  const sp = await searchParams;
+  const filter: Filter = (["ALL", "PENDING", "OVERDUE", "PAID"] as const).includes(sp?.filter as Filter)
+    ? (sp!.filter as Filter)
     : "ALL";
 
   const payments = await prisma.payment.findMany({

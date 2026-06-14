@@ -8,20 +8,11 @@ import { Button } from "@/components/ui/button";
 import { getInitials } from "@/lib/utils";
 import { Search, Plus, ChevronRight } from "lucide-react";
 
-const LEVEL_LABELS: Record<string, string> = {
-  A1: "A1 — Iniciante",
-  A2: "A2 — Básico",
-  B1: "B1 — Intermediário",
-  B2: "B2 — Inter. Avançado",
-  C1: "C1 — Avançado",
-  C2: "C2 — Proficiente",
-};
-
-export default async function StudentsPage({ searchParams }: { searchParams: { search?: string } }) {
+export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ search?: string }> }) {
   const session = await getServerSession(authOptions);
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
-  const search = searchParams?.search ?? "";
+  const search = (await searchParams)?.search ?? "";
 
   const students = await prisma.user.findMany({
     where: {
@@ -50,7 +41,6 @@ export default async function StudentsPage({ searchParams }: { searchParams: { s
           <thead>
             <tr>
               <th>Aluno</th>
-              <th>Nível</th>
               <th>Plano</th>
               <th>Cadastro</th>
               <th></th>
@@ -59,7 +49,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: { s
           <tbody>
             {students.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ textAlign: "center", padding: 32, color: "var(--muted)" }}>Nenhum aluno encontrado.</td>
+                <td colSpan={4} style={{ textAlign: "center", padding: 32, color: "var(--muted)" }}>Nenhum aluno encontrado.</td>
               </tr>
             ) : (
               students.map((s) => {
@@ -75,7 +65,6 @@ export default async function StudentsPage({ searchParams }: { searchParams: { s
                         </div>
                       </div>
                     </td>
-                    <td><span style={{ fontSize: 13, color: "var(--ink-2)" }}>{LEVEL_LABELS[s.studentProfile?.level ?? "A1"]}</span></td>
                     <td>{enr ? <Badge tone="green">{enr.plan.name}</Badge> : <Badge tone="slate">Sem plano</Badge>}</td>
                     <td><span style={{ fontSize: 13, color: "var(--ink-2)" }}>{new Intl.DateTimeFormat("pt-BR").format(s.createdAt)}</span></td>
                     <td style={{ textAlign: "right" }}>

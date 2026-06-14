@@ -25,11 +25,12 @@ const FILTERS: Record<string, { label: string; actions?: string[] }> = {
   },
 };
 
-export default async function AuditPage({ searchParams }: { searchParams: { filter?: string } }) {
+export default async function AuditPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const session = await getServerSession(authOptions);
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
-  const filterKey = searchParams?.filter && FILTERS[searchParams.filter] ? searchParams.filter : "ALL";
+  const sp = await searchParams;
+  const filterKey = sp?.filter && FILTERS[sp.filter] ? sp.filter : "ALL";
   const actions = FILTERS[filterKey].actions;
 
   const logs = await prisma.auditLog.findMany({

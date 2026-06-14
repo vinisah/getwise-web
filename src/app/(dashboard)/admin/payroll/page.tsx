@@ -12,12 +12,13 @@ import { Banknote, PiggyBank, Receipt, Wallet, AlertTriangle } from "lucide-reac
 
 const CONTRACT_LABEL: Record<string, string> = { CLT: "CLT", PJ: "PJ", HOURLY: "Horista" };
 
-export default async function PayrollPage({ searchParams }: { searchParams: { month?: string; year?: string } }) {
+export default async function PayrollPage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string }> }) {
   const session = await getServerSession(authOptions);
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
   const now = new Date();
-  const q = MonthYearQuerySchema.safeParse({ month: searchParams?.month, year: searchParams?.year });
+  const sp = await searchParams;
+  const q = MonthYearQuerySchema.safeParse({ month: sp?.month, year: sp?.year });
   const month = (q.success ? q.data.month : undefined) ?? now.getMonth() + 1;
   const year = (q.success ? q.data.year : undefined) ?? now.getFullYear();
 

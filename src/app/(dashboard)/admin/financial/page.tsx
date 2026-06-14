@@ -12,16 +12,17 @@ import { TransactionActions } from "./transaction-actions";
 import { GenerateRecurringButton } from "./generate-recurring-button";
 import { TrendingUp, TrendingDown, Wallet, Plus, RefreshCw } from "lucide-react";
 
-export default async function FinancialPage({ searchParams }: { searchParams: { month?: string; year?: string; type?: string } }) {
+export default async function FinancialPage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string; type?: string }> }) {
   const session = await getServerSession(authOptions);
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
   const now = new Date();
+  const sp = await searchParams;
   // Parâmetros inválidos → fallback para o mês atual (não quebra a página).
   const q = MonthYearQuerySchema.safeParse({
-    month: searchParams?.month,
-    year: searchParams?.year,
-    type: searchParams?.type,
+    month: sp?.month,
+    year: sp?.year,
+    type: sp?.type,
   });
   const month = (q.success ? q.data.month : undefined) ?? now.getMonth() + 1;
   const year = (q.success ? q.data.year : undefined) ?? now.getFullYear();

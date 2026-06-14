@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { fmtNum, getInitials, formatDateTime, monthRangeBrasilia } from "@/lib/utils";
 import { fmtCents } from "@/lib/money";
 import { calcPayroll } from "@/lib/payroll";
-import { Users, GraduationCap, TrendingUp, Wallet, Calendar, ArrowRight, Repeat, AlertCircle, Banknote, Scale } from "lucide-react";
+import { Users, GraduationCap, TrendingUp, Wallet, Calendar, ArrowRight, Repeat, AlertCircle, Banknote, Scale, FileBarChart } from "lucide-react";
 
 const DONUT_COLORS = ["#2A5CD6", "#1C9C6B", "#C98A12", "#6A53CC", "#D2382B", "#16204E"];
 
@@ -83,6 +83,7 @@ export default async function AdminDashboard() {
       .reduce((s, t) => s + t.amount, 0);
     months.push({ m: label, in: Math.round(inSum / 100_000), out: Math.round(outSum / 100_000) });
   }
+  const hasFinSeries = months.some((m) => m.in > 0 || m.out > 0);
 
   // Donut matrículas por plano (só planos com matrícula ativa)
   const donutData = planStats
@@ -104,18 +105,18 @@ export default async function AdminDashboard() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--gap)" }}>
         {[
-          { icon: Repeat, label: "MRR (mensalidades ativas)", value: fmtCents(mrr), color: "var(--accent)", href: "/admin/enrollments" },
-          { icon: AlertCircle, label: `Inadimplência (${overdueCount} venc.)`, value: fmtCents(overdueAmount), color: overdueAmount > 0 ? "var(--danger)" : "var(--success)", href: "/admin/receivables" },
-          { icon: Banknote, label: "Folha (custo real/mês)", value: fmtCents(payrollCost), color: "var(--brand)", href: "/admin/payroll" },
-          { icon: Scale, label: "Margem (MRR − folha)", value: fmtCents(margin), color: margin >= 0 ? "var(--success)" : "var(--danger)", href: "/admin/financial" },
+          { icon: Repeat, label: "MRR (mensalidades ativas)", value: fmtCents(mrr), color: "var(--accent)", bg: "var(--accent-soft)", href: "/admin/enrollments" },
+          { icon: AlertCircle, label: `Inadimplência (${overdueCount} venc.)`, value: fmtCents(overdueAmount), color: overdueAmount > 0 ? "var(--danger)" : "var(--success)", bg: overdueAmount > 0 ? "var(--danger-soft)" : "var(--success-soft)", href: "/admin/receivables" },
+          { icon: Banknote, label: "Folha (custo real/mês)", value: fmtCents(payrollCost), color: "var(--brand)", bg: "var(--accent-soft)", href: "/admin/payroll" },
+          { icon: Scale, label: "Margem (MRR − folha)", value: fmtCents(margin), color: margin >= 0 ? "var(--success)" : "var(--danger)", bg: margin >= 0 ? "var(--success-soft)" : "var(--danger-soft)", href: "/admin/financial" },
         ].map((k) => (
           <Link key={k.label} href={k.href} style={{ textDecoration: "none" }}>
-            <Card>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <k.icon size={15} color={k.color} />
-                <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600 }}>{k.label}</span>
+            <Card className="gw-stat" style={{ padding: "var(--stat-pad)" }}>
+              <div className="gw-stat-ic" style={{ background: k.bg, color: k.color }}>
+                <k.icon size={20} strokeWidth={1.9} />
               </div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: k.color, letterSpacing: "-.02em" }}>{k.value}</div>
+              <div style={{ fontSize: 12.5, color: "var(--muted)", fontWeight: 600, marginTop: 14 }}>{k.label}</div>
+              <div className="gw-stat-val" style={{ color: k.color }}>{k.value}</div>
             </Card>
           </Link>
         ))}
@@ -133,7 +134,17 @@ export default async function AdminDashboard() {
               </div>
             }
           />
-          <BarChart data={months} />
+          {hasFinSeries ? (
+            <BarChart data={months} />
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, minHeight: 200, textAlign: "center", gap: 8 }}>
+              <FileBarChart size={32} color="var(--muted)" />
+              <p style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink-2)" }}>Sem movimentação nos últimos 6 meses</p>
+              <p style={{ fontSize: 12.5, color: "var(--muted)", maxWidth: 280 }}>
+                Marque mensalidades como pagas ou registre transações no <Link href="/admin/financial" style={{ color: "var(--accent)" }}>Financeiro</Link> para popular o gráfico.
+              </p>
+            </div>
+          )}
         </Card>
 
         <Card>

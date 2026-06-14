@@ -26,25 +26,14 @@ export function StatCard({ label, value, sub, icon: Icon, tone = "blue", delta, 
   return (
     <div className="gw-card gw-stat" style={{ padding: "var(--stat-pad)" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <div
-          style={{
-            width: 42,
-            height: 42,
-            borderRadius: "var(--r-sm)",
-            background: t.bg,
-            color: t.fg,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon size={21} strokeWidth={1.9} />
+        <div className="gw-stat-ic" style={{ background: t.bg, color: t.fg }}>
+          <Icon size={20} strokeWidth={1.9} />
         </div>
         {delta != null && <Delta value={delta} />}
       </div>
-      <div style={{ marginTop: 16 }}>
+      <div style={{ marginTop: 14 }}>
         <div style={{ fontSize: 12.5, color: "var(--muted)", fontWeight: 600, letterSpacing: ".01em" }}>{label}</div>
-        <div style={{ fontSize: 28, fontWeight: 800, color: "var(--ink)", letterSpacing: "-.02em", marginTop: 3, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+        <div className="gw-stat-val">{value}</div>
         {sub && <div style={{ fontSize: 12.5, color: "var(--ink-2)", marginTop: 4 }}>{sub}</div>}
       </div>
       {spark && <Sparkline data={spark} color={TONE_HEX[tone] || "#2A5CD6"} />}
