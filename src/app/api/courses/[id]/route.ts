@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withErrorHandler } from "@/lib/api-error";
+import { withErrorHandler, zodMessage } from "@/lib/api-error";
 import { requireAuth, requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 import { UpdateCourseSchema } from "@/lib/schemas";
@@ -21,6 +21,11 @@ export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
   });
 
   if (!course) return NextResponse.json({ error: "Curso não encontrado" }, { status: 404 });
+
+  // Curso arquivado não existe para o aluno.
+  if (session.user.role === "STUDENT" && !course.isActive) {
+    return NextResponse.json({ error: "Curso não encontrado" }, { status: 404 });
+  }
 
   // Aluno: oculta o conteúdo de unidades bloqueadas (gate de conteúdo).
   if (session.user.role === "STUDENT") {
@@ -45,7 +50,7 @@ export const PUT = withErrorHandler(async (req: NextRequest, ctx) => {
 
   const parsed = UpdateCourseSchema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
+    return NextResponse.json({ error: zodMessage(parsed.error) }, { status: 400 });
   }
 
   const data = parsed.data;
@@ -69,8 +74,10 @@ export const DELETE = withErrorHandler(async (_req: NextRequest, ctx) => {
   const session = await requireAdmin();
   const { id } = await (ctx as Ctx).params;
 
-  await prisma.course.delete({ where: { id } });
+  // Soft-delete (arquivar): preserva histórico do aluno (progresso/tentativas/certificados),
+  // que seria destruído pelo cascade de um delete real. Restaurável via PUT isActive:true.
+  await prisma.course.update({ where: { id }, data: { isActive: false } });
 
-  await audit({ userId: session.user.id, action: "DELETE_COURSE", entity: "Course", entityId: id });
-  return NextResponse.json({ ok: true });
+  await audit({ userId: session.user.id, action: "DELETE_COURSE", entity: "Course", entityId: id, payload: { archived: true } });
+  return NextResponse.json({ ok: true, archived: true });
 });

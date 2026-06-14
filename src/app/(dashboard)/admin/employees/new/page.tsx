@@ -47,7 +47,7 @@ export default function NewEmployeePage() {
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold text-[#1a2357]">Novo Funcionário</h1>
+          <h1 className="text-3xl font-bold text-[var(--brand)]">Novo Funcionário</h1>
           <p className="text-muted-foreground">Cadastrar funcionário na folha de pagamento</p>
         </div>
       </div>

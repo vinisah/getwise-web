@@ -51,11 +51,17 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
     const charges = calcLateCharges(payment.amount, days);
     const hasCharges = charges.total > payment.amount;
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const up = await tx.payment.update({
-        where: { id },
+    const result = await prisma.$transaction(async (tx) => {
+      // Transição condicional (anti-race): só efetiva se a baixa ainda NÃO ocorreu.
+      // Duas requisições simultâneas → só a 1ª casa o WHERE; a 2ª vê count 0 e vira no-op,
+      // evitando amountPaid divergente (juros recalculados em instantes diferentes).
+      const res = await tx.payment.updateMany({
+        where: { id, status: { not: "PAID" } },
         data: { status: "PAID", paidAt: new Date(), amountPaid: charges.total, ...(method ? { method } : {}) },
       });
+      if (res.count === 0) {
+        return { changed: false as const, payment: await tx.payment.findUnique({ where: { id } }) };
+      }
       // Receita idempotente: reference é @unique → P2002 = já existe (no-op).
       try {
         await tx.financialTransaction.create({
@@ -74,11 +80,14 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
       } catch (e) {
         if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
       }
-      return up;
+      return { changed: true as const, payment: await tx.payment.findUnique({ where: { id } }) };
     });
 
-    await audit({ userId: session.user.id, action: "PAYMENT_UPDATED", entity: "Payment", entityId: id, payload: { status, amountPaid: charges.total } });
-    return NextResponse.json(updated);
+    if (!result.payment) return NextResponse.json({ error: "Mensalidade não encontrada" }, { status: 404 });
+    if (result.changed) {
+      await audit({ userId: session.user.id, action: "PAYMENT_UPDATED", entity: "Payment", entityId: id, payload: { status, amountPaid: charges.total } });
+    }
+    return NextResponse.json(result.payment);
   }
 
   // Volta a PENDENTE: limpa baixa + remove a receita vinculada.

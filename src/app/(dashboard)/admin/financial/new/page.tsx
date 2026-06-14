@@ -15,6 +15,8 @@ export default function NewTransactionPage() {
   const [error, setError] = useState("");
   const [categories, setCategories] = useState<any[]>([]);
   const [type, setType] = useState("INCOME");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [dueDate, setDueDate] = useState("");
 
   useEffect(() => {
     fetch("/api/financial/categories")
@@ -58,7 +60,7 @@ export default function NewTransactionPage() {
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold text-[#1a2357]">Nova Transação</h1>
+          <h1 className="text-3xl font-bold text-[var(--brand)]">Nova Transação</h1>
           <p className="text-muted-foreground">Registrar receita ou despesa</p>
         </div>
       </div>
@@ -100,14 +102,17 @@ export default function NewTransactionPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="date">Data *</Label>
-                <Input id="date" name="date" type="date" required defaultValue={new Date().toISOString().split("T")[0]} />
+                <Input id="date" name="date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="dueDate">Vencimento</Label>
-                <Input id="dueDate" name="dueDate" type="date" />
+                <Input id="dueDate" name="dueDate" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                {dueDate && dueDate < date && (
+                  <p className="text-xs text-amber-600">Vencimento antes da data do lançamento — confira se está correto.</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="categoryId">Categoria</Label>

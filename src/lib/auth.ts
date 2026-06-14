@@ -17,8 +17,9 @@ export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma as never) as any,
   session: {
     strategy: "jwt",
-    // 7 dias (default era 30) — janela menor para sessão roubada.
-    maxAge: 7 * 24 * 60 * 60,
+    // 1 dia — janela curta para sessão roubada. Revogação de role/isActive em tempo
+    // real é feita no requireAuth (re-checa o DB por request); ver lib/api-auth.ts.
+    maxAge: 24 * 60 * 60,
   },
   pages: {
     signIn: "/login",
@@ -37,7 +38,7 @@ export const authOptions: NextAuthOptions = {
         const email = credentials.email.toLowerCase().trim();
 
         // Rate limit por email (5 tentativas / 15 min)
-        const { allowed, retryAfter } = checkRateLimit(
+        const { allowed, retryAfter } = await checkRateLimit(
           `login:${email}`,
           LIMITS.LOGIN.max,
           LIMITS.LOGIN.windowMs
@@ -87,7 +88,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Login bem-sucedido: reset do contador
-        resetRateLimit(`login:${email}`);
+        await resetRateLimit(`login:${email}`);
 
         await audit({
           userId: user.id,
@@ -109,13 +110,33 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // Login: grava identidade no token.
       if (user) {
         token.role = (user as any).role as Role;
         token.id = user.id;
+        return token;
+      }
+      // Requests subsequentes: revalida no DB (desativação/rebaixamento valem em tempo
+      // real; o token sozinho ficaria defasado por até 1 dia). 1 lookup por PK indexada.
+      if (token.id) {
+        const db = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { isActive: true, role: true },
+        });
+        if (!db || !db.isActive) {
+          (token as any).disabled = true;
+        } else {
+          (token as any).disabled = false;
+          token.role = db.role;
+        }
       }
       return token;
     },
     async session({ session, token }) {
+      // Conta desativada/removida → sessão sem user (getServerSession retorna inválido → 401).
+      if ((token as any).disabled) {
+        return { ...session, user: undefined } as unknown as typeof session;
+      }
       if (session.user) {
         (session.user as any).role = token.role as Role;
         (session.user as any).id = token.id as string;

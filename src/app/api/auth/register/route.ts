@@ -12,7 +12,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = getClientIp(req);
 
   // Rate limit por IP (anti-abuso de cadastro)
-  const { allowed, retryAfter } = checkRateLimit(`register:${ip}`, LIMITS.API_WRITE.max, LIMITS.API_WRITE.windowMs);
+  const { allowed, retryAfter } = await checkRateLimit(`register:${ip}`, LIMITS.API_WRITE.max, LIMITS.API_WRITE.windowMs);
   if (!allowed) {
     return NextResponse.json(
       { error: `Muitas tentativas. Aguarde ${retryAfter}s.` },
@@ -53,12 +53,27 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   await prisma.emailVerificationToken.create({
     data: { email, token, expires: expiresIn(24) },
   });
-  await sendVerificationEmail(email, token);
 
-  await audit({ userId: user.id, action: "REGISTER", entity: "User", entityId: user.id, payload: { registered: true }, ip });
+  // Falha de SMTP NÃO deve derrubar o cadastro (usuário já foi criado). Loga e segue;
+  // o usuário pode reenviar a verificação. Sinaliza emailSent ao client.
+  let emailSent = true;
+  try {
+    await sendVerificationEmail(email, token);
+  } catch (e) {
+    emailSent = false;
+    console.error("[REGISTER] Falha ao enviar e-mail de verificação:", e);
+  }
+
+  await audit({ userId: user.id, action: "REGISTER", entity: "User", entityId: user.id, payload: { registered: true, emailSent }, ip });
 
   return NextResponse.json(
-    { ok: true, message: "Conta criada. Verifique seu e-mail para ativá-la." },
+    {
+      ok: true,
+      emailSent,
+      message: emailSent
+        ? "Conta criada. Verifique seu e-mail para ativá-la."
+        : "Conta criada, mas houve falha ao enviar o e-mail. Use 'Esqueci a senha' ou contate o suporte para reenviar a verificação.",
+    },
     { status: 201 }
   );
 });

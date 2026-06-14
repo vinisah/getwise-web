@@ -1,5 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import type { ZodError } from "zod";
+
+/** Rótulos PT dos campos de formulário — para a mensagem de erro apontar o campo. */
+const FIELD_LABELS: Record<string, string> = {
+  name: "Nome", email: "E-mail", password: "Senha", phone: "Telefone", cpf: "CPF",
+  state: "Estado (UF)", city: "Cidade", zipCode: "CEP", address: "Endereço", birthDate: "Nascimento",
+  title: "Título", description: "Descrição", scheduledAt: "Data/hora", duration: "Duração",
+  meetingUrl: "Link da reunião", level: "Nível", amount: "Valor", date: "Data",
+  dueDate: "Vencimento", startDate: "Data de início", salary: "Salário", role: "Cargo/Papel",
+  planId: "Plano", studentId: "Aluno", discount: "Desconto", price: "Preço",
+  reference: "Referência", month: "Mês", year: "Ano", percent: "Percentual", contractType: "Contrato",
+};
+
+/**
+ * Primeira mensagem de erro do Zod, prefixada pelo rótulo (PT) do campo quando disponível —
+ * para o usuário saber QUAL campo falhou (antes vinha só a mensagem ou "Dados inválidos").
+ */
+export function zodMessage(err: ZodError): string {
+  const issue = err.issues[0];
+  if (!issue) return "Dados inválidos";
+  const key = issue.path.find((p) => typeof p === "string") as string | undefined;
+  const label = key ? FIELD_LABELS[key] ?? key : "";
+  return label ? `${label}: ${issue.message}` : issue.message;
+}
 
 /**
  * Erro controlado da API — converte para resposta JSON com status HTTP correto.

@@ -10,7 +10,7 @@ import { getClientIp } from "@/lib/audit";
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = getClientIp(req);
 
-  const { allowed, retryAfter } = checkRateLimit(`forgot:${ip}`, LIMITS.LOGIN.max, LIMITS.LOGIN.windowMs);
+  const { allowed, retryAfter } = await checkRateLimit(`forgot:${ip}`, LIMITS.LOGIN.max, LIMITS.LOGIN.windowMs);
   if (!allowed) {
     return NextResponse.json({ error: `Muitas tentativas. Aguarde ${retryAfter}s.` }, { status: 429 });
   }

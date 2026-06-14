@@ -53,6 +53,7 @@ const NAV: Record<string, NavEntry[]> = {
     { section: "Aprender" },
     { id: "dashboard", label: "Dashboard", href: "/student", icon: LayoutGrid },
     { id: "courses", label: "Cursos", href: "/student/courses", icon: BookOpen },
+    { id: "lessons", label: "Aulas", href: "/student/lessons", icon: Calendar },
     { id: "exercises", label: "Exercícios", href: "/student/exercises", icon: PenLine },
     { id: "tutor", label: "Tutor IA", href: "/student/tutor", icon: Bot, badge: "AI" },
     { section: "Conquistas" },
@@ -89,10 +90,25 @@ export function Sidebar() {
     setOpen(false);
   }, [pathname, setOpen]);
 
+  // Acessibilidade do drawer mobile: fecha no Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, setOpen]);
+
   return (
     <>
       {open && <div className="gw-backdrop" onClick={() => setOpen(false)} />}
-      <aside className={cx("gw-sidebar", open && "gw-open")}>
+      <aside
+        className={cx("gw-sidebar", open && "gw-open")}
+        aria-label="Navegação principal"
+        role={open ? "dialog" : undefined}
+        aria-modal={open ? true : undefined}
+      >
         <div className="gw-side-brand">
           <Logo variant="full" white height={38} />
         </div>

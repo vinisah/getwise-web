@@ -30,6 +30,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
     getCompletedUnitIds(user.id, id),
   ]);
   if (!course) notFound();
+  if (!course.isActive) notFound(); // curso arquivado não existe para o aluno
 
   if (!unlocked) {
     return (

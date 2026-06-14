@@ -76,7 +76,7 @@ export default function NewLessonPage() {
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold text-[#1a2357]">Nova Aula</h1>
+          <h1 className="text-3xl font-bold text-[var(--brand)]">Nova Aula</h1>
           <p className="text-muted-foreground">Agendar uma nova aula</p>
         </div>
       </div>

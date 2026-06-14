@@ -14,7 +14,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
   // Anti-brute-force de token (por IP).
   const ip = getClientIp(req);
-  const rl = checkRateLimit(`verify:${ip}`, LIMITS.API_WRITE.max, LIMITS.API_WRITE.windowMs);
+  const rl = await checkRateLimit(`verify:${ip}`, LIMITS.API_WRITE.max, LIMITS.API_WRITE.windowMs);
   if (!rl.allowed) {
     return NextResponse.redirect(`${appUrl}/login?verify=ratelimited`);
   }

@@ -38,6 +38,7 @@ export default async function UnitPage({ params }: { params: Promise<{ id: strin
     prisma.unitVideoProgress.findUnique({ where: { userId_unitId: { userId: user.id, unitId } } }),
   ]);
   if (!unit || unit.module.courseId !== courseId) notFound();
+  if (user.role === "STUDENT" && !unit.module.course.isActive) notFound(); // curso arquivado
 
   // Guards de bloqueio (aluno) — funções puras sobre os dados já carregados
   const unitUnlocked = isUnitUnlocked(unitId, ordered, completed);

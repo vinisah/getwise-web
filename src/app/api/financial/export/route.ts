@@ -12,8 +12,15 @@ const METHOD_LABEL: Record<string, string> = {
 /** Centavos → "1234,56" (decimal brasileiro, sem milhar — Excel BR entende). */
 const csvMoney = (cents: number) => (cents / 100).toFixed(2).replace(".", ",");
 
-/** Escapa campo CSV (separador ;). */
-const esc = (v: string) => (/[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+/**
+ * Escapa campo CSV (separador ;) e neutraliza CSV formula injection.
+ * Excel/LibreOffice executa células iniciadas por = + - @ (ou tab/CR) como fórmula —
+ * prefixa com ' (apóstrofo) para forçar interpretação como texto.
+ */
+const esc = (v: string) => {
+  const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  return /[;"\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+};
 
 /**
  * GET /api/financial/export?month=&year= — CSV das transações p/ o contador.

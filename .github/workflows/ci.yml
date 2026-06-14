@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Gate de qualidade antes do auto-deploy da Vercel (push → main).
+# Roda lint + typecheck + testes. Sem DB real: testes usam mocks (ver src/test/setup.ts).
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      # Placeholders: prisma generate lê o schema (não conecta); NextAuth não roda nos testes.
+      DATABASE_URL: postgresql://user:pass@localhost:5432/ci
+      NEXTAUTH_SECRET: ci-placeholder-secret
+      NEXTAUTH_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate
+
+      # Lint informativo: o projeto tem dívida de lint pré-existente (any/react-compiler).
+      # Não bloqueia o CI até a limpeza dedicada; os gates duros são typecheck + testes.
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Tests (com cobertura + thresholds)
+        run: npm run test:coverage

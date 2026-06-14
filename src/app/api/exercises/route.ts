@@ -43,6 +43,19 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     orderBy: { createdAt: "desc" },
   });
 
+  // Aluno NÃO recebe gabarito na listagem — senão coleta correctAnswer de exercícios de
+  // unidade (que contam na progressão) sem resolver. O gabarito vem da resposta do attempt,
+  // gated por aprovação. Espelha a omissão de GET /api/exercises/[id].
+  if (session.user.role === "STUDENT") {
+    const safe = exercises.map((ex) => {
+      const { correctAnswer: _c, explanation: _e, ...rest } = ex;
+      void _c;
+      void _e;
+      return rest;
+    });
+    return NextResponse.json(safe);
+  }
+
   return NextResponse.json(exercises);
 });
 

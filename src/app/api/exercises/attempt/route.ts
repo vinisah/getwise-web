@@ -6,6 +6,7 @@ import { ExerciseAttemptSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 import { gradeAnswer } from "@/lib/services/grading";
 import { recomputeUnitCompletion } from "@/lib/services/unit-completion";
+import { canAccessUnit } from "@/lib/services/unlock";
 import { acquireLock, releaseLock, submissionKey } from "@/lib/submission-lock";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
@@ -23,13 +24,20 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   // Edge case: impedir submissões simultâneas do mesmo exercício
   const lockKey = submissionKey(session.user.id, exerciseId);
-  if (!acquireLock(lockKey)) {
+  if (!(await acquireLock(lockKey))) {
     return NextResponse.json({ error: "Submissão em processamento. Aguarde." }, { status: 409 });
   }
 
   try {
     const exercise = await prisma.exercise.findUnique({ where: { id: exerciseId } });
     if (!exercise) return NextResponse.json({ error: "Exercício não encontrado" }, { status: 404 });
+
+    // Gate de conteúdo: aluno só submete em exercício de unidade desbloqueada.
+    // Sem isso, qualquer aluno enumera ids (GET /api/exercises) e colhe gabarito de unidades bloqueadas.
+    if (session.user.role === "STUDENT" && exercise.unitId) {
+      const ok = await canAccessUnit(session.user.id, exercise.unitId);
+      if (!ok) return NextResponse.json({ error: "Unidade bloqueada" }, { status: 403 });
+    }
 
     const result = gradeAnswer(
       { type: exercise.type, correctAnswer: exercise.correctAnswer, points: exercise.points },
@@ -75,16 +83,20 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       unitCompleted = rc.completed;
     }
 
+    // Revela gabarito quando: staff; OU aluno acertou (passed); OU exercício de prática pura
+    // (sem unitId — não conta em progressão, feedback didático ok). Exercício de UNIDADE só
+    // revela ao aprovar, senão aluno burlaria a conclusão da unidade colhendo a resposta.
+    const reveal = session.user.role !== "STUDENT" || result.passed || !exercise.unitId;
+
     return NextResponse.json({
       isCorrect: result.isCorrect,
       scorePercent: result.scorePercent,
       passed: result.passed,
       bestScorePercent,
-      correctAnswer: exercise.correctAnswer,
-      explanation: exercise.explanation,
+      ...(reveal ? { correctAnswer: exercise.correctAnswer, explanation: exercise.explanation } : {}),
       unitCompleted,
     });
   } finally {
-    releaseLock(lockKey);
+    await releaseLock(lockKey);
   }
 });

@@ -45,9 +45,10 @@ describe("PATCH /api/payments/[id]", () => {
   const ctx = { params: Promise.resolve({ id: "pay1" }) };
 
   it("PAID cria receita no financeiro com o valor da mensalidade", async () => {
-    (mockPrisma.payment.findUnique as any).mockResolvedValueOnce(basePayment);
-    (mockPrisma.payment.update as any).mockResolvedValueOnce({ ...basePayment, status: "PAID" });
-    (mockPrisma.financialTransaction.findFirst as any).mockResolvedValueOnce(null);
+    (mockPrisma.payment.findUnique as any)
+      .mockResolvedValueOnce(basePayment)                          // leitura externa (404 check)
+      .mockResolvedValueOnce({ ...basePayment, status: "PAID" });  // resultado pós-updateMany
+    (mockPrisma.payment.updateMany as any).mockResolvedValueOnce({ count: 1 });
     (mockPrisma.financialTransaction.create as any).mockResolvedValueOnce({});
 
     const res = await paymentPATCH(req("http://localhost/api/payments/pay1", "PATCH", { status: "PAID", method: "PIX" }), ctx as any);
@@ -61,9 +62,10 @@ describe("PATCH /api/payments/[id]", () => {
 
   it("PAID vencida há 30 dias inclui multa 2% + juros 1%", async () => {
     const overdue = { ...basePayment, dueDate: new Date(Date.now() - 30 * 86_400_000) };
-    (mockPrisma.payment.findUnique as any).mockResolvedValueOnce(overdue);
-    (mockPrisma.payment.update as any).mockResolvedValueOnce({ ...overdue, status: "PAID" });
-    (mockPrisma.financialTransaction.findFirst as any).mockResolvedValueOnce(null);
+    (mockPrisma.payment.findUnique as any)
+      .mockResolvedValueOnce(overdue)
+      .mockResolvedValueOnce({ ...overdue, status: "PAID" });
+    (mockPrisma.payment.updateMany as any).mockResolvedValueOnce({ count: 1 });
     (mockPrisma.financialTransaction.create as any).mockResolvedValueOnce({});
 
     const res = await paymentPATCH(req("http://localhost/api/payments/pay1", "PATCH", { status: "PAID" }), ctx as any);
@@ -86,8 +88,10 @@ describe("PATCH /api/payments/[id]", () => {
   });
 
   it("PAID idempotente: reference duplicada (P2002) é silenciada", async () => {
-    (mockPrisma.payment.findUnique as any).mockResolvedValueOnce(basePayment);
-    (mockPrisma.payment.update as any).mockResolvedValueOnce({ ...basePayment, status: "PAID" });
+    (mockPrisma.payment.findUnique as any)
+      .mockResolvedValueOnce(basePayment)
+      .mockResolvedValueOnce({ ...basePayment, status: "PAID" });
+    (mockPrisma.payment.updateMany as any).mockResolvedValueOnce({ count: 1 });
     (mockPrisma.financialTransaction.create as any).mockRejectedValueOnce(P2002);
 
     const res = await paymentPATCH(req("http://localhost/api/payments/pay1", "PATCH", { status: "PAID" }), ctx as any);
@@ -140,6 +144,19 @@ describe("POST /api/financial/recurring", () => {
     expect(created.isRecurring).toBe(true);
     expect(created.reference).toBe("recurring:src1:06/2026"); // idempotência estável
     expect(created.date.getUTCMonth()).toBe(5); // junho (0-based)
+  });
+
+  it("clone-de-clone mantém a raiz na reference (anti-duplicação fora de ordem)", async () => {
+    // Fonte do mês anterior é ela mesma um clone gerado: reference = recurring:<raiz>:<MM/AAAA>.
+    const clonedSource = { ...recurringTx, id: "clone-mai", reference: "recurring:src1:05/2026" };
+    (mockPrisma.financialTransaction.findMany as any).mockResolvedValueOnce([clonedSource]);
+    (mockPrisma.financialTransaction.create as any).mockResolvedValueOnce({});
+
+    const res = await recurringPOST(req("http://localhost/api/financial/recurring", "POST", { month: 6, year: 2026 }));
+    expect(res.status).toBe(200);
+    const created = (mockPrisma.financialTransaction.create as any).mock.calls[0][0].data;
+    // Ancorado na RAIZ (src1), não no id do predecessor (clone-mai).
+    expect(created.reference).toBe("recurring:src1:06/2026");
   });
 
   it("dedupe: P2002 (já gerada no mês) → pula, sem duplicar", async () => {

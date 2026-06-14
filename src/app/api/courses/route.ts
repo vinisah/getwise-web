@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withErrorHandler } from "@/lib/api-error";
+import { withErrorHandler, zodMessage } from "@/lib/api-error";
 import { requireAuth, requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 import { CreateCourseSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 
 export const GET = withErrorHandler(async (_req: NextRequest) => {
-  await requireAuth();
+  const session = await requireAuth();
 
   const courses = await prisma.course.findMany({
+    // Aluno só vê cursos ativos; staff vê todos (inclui arquivados p/ gestão).
+    where: session.user.role === "STUDENT" ? { isActive: true } : {},
     orderBy: [{ order: "asc" }, { level: "asc" }],
     include: {
       _count: { select: { modules: true } },
@@ -24,7 +26,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const parsed = CreateCourseSchema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
+    return NextResponse.json({ error: zodMessage(parsed.error) }, { status: 400 });
   }
 
   const { title, description, level, coverImage, order, isActive } = parsed.data;

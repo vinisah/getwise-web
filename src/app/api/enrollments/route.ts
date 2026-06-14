@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ApiError, withErrorHandler } from "@/lib/api-error";
+import { ApiError, withErrorHandler, zodMessage } from "@/lib/api-error";
 import { requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 import { CreateEnrollmentSchema } from "@/lib/schemas";
@@ -41,10 +41,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const parsed = CreateEnrollmentSchema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Dados inválidos" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: zodMessage(parsed.error) }, { status: 400 });
   }
 
   const { studentId, planId, startDate, notes } = parsed.data;

@@ -7,10 +7,17 @@ import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 import OpenAI from "openai";
 
-// Tutor via Groq (API compatível com OpenAI SDK)
+// Caminho crítico LLM: roda em Node e tem teto de tempo no serverless.
+export const runtime = "nodejs";
+export const maxDuration = 30;
+
+// Tutor via Groq (API compatível com OpenAI SDK).
+// timeout < maxDuration p/ o client abortar antes de a função ser cortada pela Vercel.
 const groq = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
   baseURL: "https://api.groq.com/openai/v1",
+  timeout: 20_000,
+  maxRetries: 1,
 });
 const GROQ_MODEL = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
 
@@ -59,7 +66,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const session = await requireAuth();
 
   // Anti-abuso de custo: limita chamadas pagas à Groq por usuário.
-  const { allowed, retryAfter } = checkRateLimit(`ai:${session.user.id}`, LIMITS.AI_CHAT.max, LIMITS.AI_CHAT.windowMs);
+  const { allowed, retryAfter } = await checkRateLimit(`ai:${session.user.id}`, LIMITS.AI_CHAT.max, LIMITS.AI_CHAT.windowMs);
   if (!allowed) {
     return NextResponse.json({ error: `Muitas mensagens. Aguarde ${retryAfter}s.` }, { status: 429 });
   }
@@ -91,7 +98,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     });
   }
 
-  await prisma.chatMessage.create({
+  const userMsg = await prisma.chatMessage.create({
     data: {
       sessionId: chatSession.id,
       role: "user",
@@ -104,16 +111,28 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     content: m.content,
   }));
 
-  const completion = await groq.chat.completions.create({
-    model: GROQ_MODEL,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      ...history,
-      { role: "user", content: message },
-    ],
-    max_tokens: 800,
-    temperature: 0.7,
-  });
+  let completion;
+  try {
+    completion = await groq.chat.completions.create({
+      model: GROQ_MODEL,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...history,
+        { role: "user", content: message },
+      ],
+      max_tokens: 800,
+      temperature: 0.7,
+    });
+  } catch (e) {
+    // Falha/timeout do provedor: remove a mensagem do usuário órfã (sem resposta) e
+    // responde 503 — não vaza 500 cru nem deixa o histórico inconsistente.
+    await prisma.chatMessage.delete({ where: { id: userMsg.id } }).catch(() => {});
+    console.error("[AI] Groq indisponível:", e);
+    return NextResponse.json(
+      { error: "Tutor indisponível no momento. Tente novamente em instantes." },
+      { status: 503 }
+    );
+  }
 
   const reply = completion.choices[0]?.message?.content ?? "Sorry, I couldn't generate a response.";
 

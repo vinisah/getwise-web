@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { withErrorHandler } from "@/lib/api-error";
+import { withErrorHandler, ApiError, zodMessage } from "@/lib/api-error";
 import { requireAuth } from "@/lib/api-auth";
-import { ApiError } from "@/lib/api-error";
 import { audit } from "@/lib/audit";
 import { CreateLessonSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
@@ -61,10 +60,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const parsed = CreateLessonSchema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Dados inválidos" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: zodMessage(parsed.error) }, { status: 400 });
   }
 
   const { teacherId, title, description, scheduledAt, duration, meetingUrl, level, maxStudents, studentIds } = parsed.data;

@@ -123,6 +123,8 @@ model User {
   videoProgress     UnitVideoProgress[]
   materialDownloads MaterialDownload[]
 
+  // role filtrado em listagens (students/teachers) e KPIs do dashboard; name serve o orderBy junto.
+  @@index([role, name])
   @@map("users")
 }
 
@@ -429,7 +431,8 @@ model FinancialTransaction {
   category FinancialCategory? @relation(fields: [categoryId], references: [id])
   creator  User?              @relation(fields: [createdBy], references: [id])
 
-  @@index([date, isPaid, type])
+  // Igualdades (type, isPaid) antes do range (date) — serve melhor os filtros de KPI/DRE.
+  @@index([type, isPaid, date])
   @@index([categoryId])
   @@index([createdBy])
   @@map("financial_transactions")
@@ -477,6 +480,8 @@ model SalaryPayment {
 
   @@unique([employeeId, month, year, type])
   @@index([employeeId])
+  // folha consulta por competência sem employeeId (payroll route/page) → índice dedicado.
+  @@index([year, month])
   @@map("salary_payments")
 }
 

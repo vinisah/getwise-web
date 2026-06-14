@@ -29,7 +29,7 @@ export const CreateStudentSchema = z.object({
   birthDate: OptionalDateString,
   address: z.string().max(200).optional(),
   city: z.string().max(100).optional(),
-  state: z.string().length(2).optional(),
+  state: z.string().length(2, "Informe a UF com 2 letras (ex.: SP)").optional().or(z.literal("")),
   zipCode: z.string().max(9).optional(),
   level: CEFRLevel.default("A1"),
   emergencyContact: z.string().max(100).optional(),
@@ -73,6 +73,20 @@ export const CreateLessonSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
+// Edição de aula — campos opcionais; status restrito às transições seguras.
+export const UpdateLessonSchema = z
+  .object({
+    title: z.string().min(2).max(200).optional(),
+    description: z.string().max(1000).optional(),
+    scheduledAt: OptionalDateString,
+    duration: z.coerce.number().int().min(15).max(180).optional(),
+    meetingUrl: z.string().url("URL inválida").optional().or(z.literal("")),
+    level: CEFRLevel.optional(),
+    status: z.enum(["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
+    notes: z.string().max(1000).optional(),
+  })
+  .refine((d) => Object.values(d).some((v) => v !== undefined), { message: "Nada a atualizar" });
+
 // ─── Funcionários ─────────────────────────────────────────────────────────────
 
 export const CreateEmployeeSchema = z.object({
@@ -102,7 +116,12 @@ export const CreateTransactionSchema = z.object({
   paymentMethod: z
     .enum(["PIX", "CREDIT_CARD", "DEBIT_CARD", "BOLETO"])
     .optional(),
-  reference: z.string().max(100).optional(),
+  // Bloqueia colisão com namespaces internos reservados (payment:/salary:/recurring:/enrollment:).
+  reference: z
+    .string()
+    .max(100)
+    .refine((v) => !/^(payment|salary|recurring|enrollment):/i.test(v), "Prefixo de referência reservado")
+    .optional(),
   notes: z.string().max(1000).optional(),
   userId: z.string().optional(),
 });
@@ -113,6 +132,10 @@ export const CreateTransactionSchema = z.object({
 export const UpdateTransactionSchema = CreateTransactionSchema.partial().extend({
   isPaid: z.boolean().or(z.enum(["true", "false"]).transform((v) => v === "true")).optional(),
   isRecurring: z.boolean().or(z.enum(["true", "false"]).transform((v) => v === "true")).optional(),
+  // Edição reenvia o reference já-existente (inclusive os internos payment:/salary:/recurring:).
+  // O guard de prefixo reservado vale só na CRIAÇÃO (input humano) — sem ele aqui, senão
+  // recategorizar uma despesa recorrente/mensalidade/folha quebraria com 400.
+  reference: z.string().max(100).optional(),
 });
 
 // Filtro de período (query params chegam como string).
@@ -266,7 +289,12 @@ export const CreateCourseSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
-export const UpdateCourseSchema = CreateCourseSchema.partial();
+// .partial() NÃO remove .default() — sem o override abaixo, um PUT de {isActive} injetaria
+// order:0/isActive:true e a rota gravaria (clobber). Redefine sem default.
+export const UpdateCourseSchema = CreateCourseSchema.partial().extend({
+  order: z.coerce.number().int().min(0).max(999).optional(),
+  isActive: z.boolean().optional(),
+});
 
 export const CreateModuleSchema = z.object({
   courseId: z.string().min(1, "ID inválido"),
@@ -275,7 +303,9 @@ export const CreateModuleSchema = z.object({
   order: z.coerce.number().int().min(0).max(999).default(0),
 });
 
-export const UpdateModuleSchema = CreateModuleSchema.partial().omit({ courseId: true });
+export const UpdateModuleSchema = CreateModuleSchema.partial().omit({ courseId: true }).extend({
+  order: z.coerce.number().int().min(0).max(999).optional(), // sem default herdado (anti-clobber)
+});
 
 export const CreateUnitSchema = z.object({
   moduleId: z.string().min(1, "ID inválido"),
@@ -289,7 +319,12 @@ export const CreateUnitSchema = z.object({
   order: z.coerce.number().int().min(0).max(999).default(0),
 });
 
-export const UpdateUnitSchema = CreateUnitSchema.partial().omit({ moduleId: true });
+export const UpdateUnitSchema = CreateUnitSchema.partial().omit({ moduleId: true }).extend({
+  // sem defaults herdados (content/type/order) — evitaria clobber em edição parcial.
+  content: z.string().max(50_000).optional(),
+  type: z.enum(["READING", "VIDEO", "MIXED"]).optional(),
+  order: z.coerce.number().int().min(0).max(999).optional(),
+});
 
 export const CreateMaterialSchema = z.object({
   unitId: z.string().min(1, "ID inválido"),

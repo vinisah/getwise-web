@@ -1,20 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { ADMIN_PATHS, TEACHER_PATHS, AUTH_PATHS, roleHome } from "@/lib/roles";
 
-// Rotas protegidas por papel
-const ADMIN_PATHS = ["/admin"];
-const TEACHER_PATHS = ["/teacher"];
-const STUDENT_PATHS = ["/student"];
-const AUTH_PATHS = [...ADMIN_PATHS, ...TEACHER_PATHS, ...STUDENT_PATHS];
-
-/** Home de cada papel — usado no roteamento da raiz e em redirects de papel errado. */
-function roleHome(role: string | undefined): string {
-  if (role === "ADMIN") return "/admin";
-  if (role === "TEACHER") return "/teacher";
-  return "/student";
-}
-
-export async function middleware(req: NextRequest) {
+// Next 16: convenção `middleware` foi renomeada para `proxy` (roda em Node.js).
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   const isRoot = pathname === "/";

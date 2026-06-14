@@ -150,7 +150,7 @@ function ExerciseCard({ exercise, index }: { exercise: Exercise; index: number }
       {/* feedback */}
       {result && !result.passed && (
         <div style={{ marginTop: 12, fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
-          <XCircle size={15} /> Não passou ({result.scorePercent}%). {result.explanation}
+          <XCircle size={15} /> Não passou ({result.scorePercent}%).{result.explanation ? ` ${result.explanation}` : ""}
         </div>
       )}
       {result?.passed && (

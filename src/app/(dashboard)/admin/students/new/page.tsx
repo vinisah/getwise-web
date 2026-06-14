@@ -29,7 +29,11 @@ export default function NewStudentPage() {
     setError("");
 
     const formData = new FormData(e.currentTarget);
-    const data = Object.fromEntries(formData.entries());
+    // Remove campos opcionais vazios: '' não é undefined e quebraria validadores
+    // como .length(2)/.email()/.url() em campos opcionais não preenchidos.
+    const data = Object.fromEntries(
+      [...formData.entries()].filter(([, v]) => v !== "")
+    );
 
     const res = await fetch("/api/students", {
       method: "POST",
@@ -58,7 +62,7 @@ export default function NewStudentPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold text-[#1a2357]">Novo Aluno</h1>
+          <h1 className="text-3xl font-bold text-[var(--brand)]">Novo Aluno</h1>
           <p className="text-muted-foreground">Cadastrar um novo aluno no sistema</p>
         </div>
       </div>

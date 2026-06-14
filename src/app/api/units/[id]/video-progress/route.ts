@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/api-auth";
 import { VideoProgressSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 import { recomputeUnitCompletion } from "@/lib/services/unit-completion";
+import { canAccessUnit } from "@/lib/services/unlock";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -24,6 +25,12 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx) => {
 
   const unit = await prisma.unit.findUnique({ where: { id: unitId }, select: { id: true } });
   if (!unit) return NextResponse.json({ error: "Unidade não encontrada" }, { status: 404 });
+
+  // Gate de conteúdo: aluno só registra progresso em unidade desbloqueada (simetria com exercises/attempt).
+  if (session.user.role === "STUDENT") {
+    const ok = await canAccessUnit(session.user.id, unitId);
+    if (!ok) return NextResponse.json({ error: "Unidade bloqueada" }, { status: 403 });
+  }
 
   // Não regredir watchedPercent (mantém o máximo já assistido)
   const existing = await prisma.unitVideoProgress.findUnique({

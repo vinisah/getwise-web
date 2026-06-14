@@ -81,9 +81,10 @@ export async function isCourseUnlocked(userId: string, courseId: string): Promis
 export async function canAccessUnit(userId: string, unitId: string): Promise<boolean> {
   const unit = await prisma.unit.findUnique({
     where: { id: unitId },
-    select: { module: { select: { courseId: true } } },
+    select: { module: { select: { courseId: true, course: { select: { isActive: true } } } } },
   });
   if (!unit) return false;
+  if (!unit.module.course.isActive) return false; // curso arquivado: conteúdo congelado p/ aluno
   const courseId = unit.module.courseId;
   const [courseUnlocked, ordered, completed] = await Promise.all([
     isCourseUnlocked(userId, courseId),

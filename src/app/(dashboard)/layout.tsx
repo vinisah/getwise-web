@@ -12,7 +12,8 @@ export default async function DashboardLayout({
 }) {
   const session = await getServerSession(authOptions);
 
-  if (!session) {
+  // Sessão sem user = conta desativada/inválida (ver callback session em lib/auth.ts).
+  if (!session?.user) {
     redirect("/login");
   }
 

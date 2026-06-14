@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, Trophy, RefreshCw } from "lucide-react";
+import { CheckCircle, XCircle, Trophy, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Exercise {
@@ -12,8 +12,7 @@ interface Exercise {
   title: string;
   type: string;
   level: string;
-  content: any;
-  correctAnswer: any;
+  content: { question?: string; options?: string[] } | null;
   explanation?: string;
   points: number;
   timeLimit?: number;
@@ -22,7 +21,7 @@ interface Exercise {
 interface AttemptResult {
   isCorrect: boolean;
   score: number;
-  correctAnswer: any;
+  correctAnswer?: unknown;
   explanation?: string;
 }
 
@@ -91,7 +90,7 @@ export default function ExercisesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-6 w-6 animate-spin text-[#1a2357]" />
+        <RefreshCw className="h-6 w-6 animate-spin text-[var(--brand)]" />
       </div>
     );
   }
@@ -99,7 +98,7 @@ export default function ExercisesPage() {
   if (exercises.length === 0) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-[#1a2357]">Exercícios</h1>
+        <h1 className="text-3xl font-bold text-[var(--brand)]">Exercícios</h1>
         <Card>
           <CardContent className="p-12 text-center">
             <p className="text-muted-foreground">Nenhum exercício disponível para o seu nível ainda.</p>
@@ -118,19 +117,19 @@ export default function ExercisesPage() {
     const accuracy = Math.round((score / exercises.reduce((sum, e) => sum + e.points, 0)) * 100);
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-[#1a2357]">Exercícios</h1>
+        <h1 className="text-3xl font-bold text-[var(--brand)]">Exercícios</h1>
         <Card className="max-w-lg mx-auto">
           <CardContent className="p-8 text-center space-y-6">
             <div className="bg-yellow-100 rounded-full p-6 w-fit mx-auto">
               <Trophy className="h-12 w-12 text-yellow-600" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-[#1a2357]">Well done!</h2>
+              <h2 className="text-2xl font-bold text-[var(--brand)]">Well done!</h2>
               <p className="text-muted-foreground">You completed all exercises!</p>
             </div>
             <div className="grid grid-cols-3 gap-4 text-center">
               <div className="bg-muted rounded-lg p-3">
-                <p className="text-2xl font-bold text-[#1a2357]">{completed}</p>
+                <p className="text-2xl font-bold text-[var(--brand)]">{completed}</p>
                 <p className="text-xs text-muted-foreground">Exercícios</p>
               </div>
               <div className="bg-muted rounded-lg p-3">
@@ -158,7 +157,7 @@ export default function ExercisesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-[#1a2357]">Exercícios</h1>
+          <h1 className="text-3xl font-bold text-[var(--brand)]">Exercícios</h1>
           <p className="text-muted-foreground">
             {current + 1} de {exercises.length} · {score} pontos
           </p>
@@ -172,14 +171,14 @@ export default function ExercisesPage() {
       {/* Progress bar */}
       <div className="w-full bg-muted rounded-full h-2">
         <div
-          className="bg-[#1a2357] h-2 rounded-full transition-all"
+          className="bg-[var(--brand)] h-2 rounded-full transition-all"
           style={{ width: `${((current) / exercises.length) * 100}%` }}
         />
       </div>
 
       <Card className="max-w-2xl">
         <CardHeader>
-          <CardTitle className="text-lg text-[#1a2357]">{exercise.title}</CardTitle>
+          <CardTitle className="text-lg text-[var(--brand)]">{exercise.title}</CardTitle>
           {exercise.content?.question && (
             <p className="text-base">{exercise.content.question}</p>
           )}
@@ -195,14 +194,14 @@ export default function ExercisesPage() {
                   className={cn(
                     "w-full text-left px-4 py-3 rounded-lg border text-sm transition-all",
                     result
-                      ? opt === String(exercise.correctAnswer)
+                      ? result.correctAnswer != null && opt === String(result.correctAnswer)
                         ? "bg-green-50 border-green-500 text-green-800"
                         : opt === selected
                         ? "bg-red-50 border-red-400 text-red-700"
                         : "border-input opacity-60"
                       : selected === opt
-                      ? "bg-[#1a2357]/10 border-[#1a2357] text-[#1a2357]"
-                      : "border-input hover:border-[#1a2357] hover:bg-muted"
+                      ? "bg-[var(--brand)]/10 border-[var(--brand)] text-[var(--brand)]"
+                      : "border-input hover:border-[var(--brand)] hover:bg-muted"
                   )}
                 >
                   <span className="font-medium mr-2">{String.fromCharCode(65 + i)}.</span>
@@ -235,14 +234,14 @@ export default function ExercisesPage() {
                   className={cn(
                     "flex-1 py-3 rounded-lg border text-sm font-medium transition-all",
                     result
-                      ? String(exercise.correctAnswer).toLowerCase() === opt.toLowerCase()
+                      ? result.correctAnswer != null && String(result.correctAnswer).toLowerCase() === opt.toLowerCase()
                         ? "bg-green-50 border-green-500 text-green-800"
                         : selected?.toLowerCase() === opt.toLowerCase()
                         ? "bg-red-50 border-red-400"
                         : "opacity-60 border-input"
                       : selected === opt
-                      ? "bg-[#1a2357] text-white border-[#1a2357]"
-                      : "border-input hover:border-[#1a2357]"
+                      ? "bg-[var(--brand)] text-white border-[var(--brand)]"
+                      : "border-input hover:border-[var(--brand)]"
                   )}
                 >
                   {opt}
@@ -265,7 +264,7 @@ export default function ExercisesPage() {
                 <p className={cn("font-medium text-sm", result.isCorrect ? "text-green-800" : "text-red-800")}>
                   {result.isCorrect ? `Correct! +${result.score} points` : "Not quite right."}
                 </p>
-                {!result.isCorrect && (
+                {!result.isCorrect && result.correctAnswer != null && (
                   <p className="text-sm text-red-700 mt-1">
                     Correct answer: <strong>{String(result.correctAnswer)}</strong>
                   </p>

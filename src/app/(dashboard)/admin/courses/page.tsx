@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { Card, Badge } from "@/components/gw/primitives";
 import { Button } from "@/components/ui/button";
 import { Plus, ChevronRight } from "lucide-react";
+import { CourseArchiveButton } from "./course-archive-button";
 
 const LEVEL_LABELS: Record<string, string> = {
   A1: "A1 — Iniciante", A2: "A2 — Básico", B1: "B1 — Intermediário",
@@ -46,7 +47,10 @@ export default async function AdminCoursesPage() {
                   <td><span style={{ fontSize: 13, color: "var(--ink-2)" }}>{c._count.modules}</span></td>
                   <td><Badge tone={c.isActive ? "green" : "slate"} dot>{c.isActive ? "Ativo" : "Inativo"}</Badge></td>
                   <td style={{ textAlign: "right" }}>
-                    <Link href={`/admin/courses/${c.id}`}><button className="gw-icon-btn sm"><ChevronRight size={18} /></button></Link>
+                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", alignItems: "center" }}>
+                      <CourseArchiveButton courseId={c.id} isActive={c.isActive} />
+                      <Link href={`/admin/courses/${c.id}`}><button className="gw-icon-btn sm"><ChevronRight size={18} /></button></Link>
+                    </div>
                   </td>
                 </tr>
               ))

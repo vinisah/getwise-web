@@ -5,7 +5,10 @@ import type { SessionUser, UserRole } from "@/types";
 
 /**
  * Retorna a sessão autenticada ou lança ApiError(401).
- * Elimina o boilerplate `getServerSession + null check` repetido 19× nas rotas.
+ * Elimina o boilerplate `getServerSession + null check` repetido nas rotas.
+ *
+ * Revogação em tempo real (desativação/rebaixamento de role) é aplicada no callback
+ * `jwt`/`session` do NextAuth (ver lib/auth.ts), que re-checa o DB a cada getServerSession.
  */
 export async function requireAuth(): Promise<{ user: SessionUser }> {
   const session = await getServerSession(authOptions);

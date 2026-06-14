@@ -9,7 +9,7 @@ import { audit, getClientIp } from "@/lib/audit";
 export const POST = withErrorHandler(async (req: NextRequest) => {
   // Anti-brute-force de token (por IP).
   const ip = getClientIp(req);
-  const rl = checkRateLimit(`reset:${ip}`, LIMITS.API_WRITE.max, LIMITS.API_WRITE.windowMs);
+  const rl = await checkRateLimit(`reset:${ip}`, LIMITS.API_WRITE.max, LIMITS.API_WRITE.windowMs);
   if (!rl.allowed) {
     return NextResponse.json({ error: `Muitas tentativas. Aguarde ${rl.retryAfter}s.` }, { status: 429 });
   }

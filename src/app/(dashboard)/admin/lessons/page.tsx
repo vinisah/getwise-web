@@ -7,6 +7,7 @@ import { Card, Badge } from "@/components/gw/primitives";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/utils";
 import { Plus, Users } from "lucide-react";
+import { LessonActions } from "./lesson-actions";
 
 const STATUS: Record<string, { label: string; tone: string }> = {
   SCHEDULED: { label: "Agendada", tone: "blue" },
@@ -51,11 +52,11 @@ export default async function LessonsPage({ searchParams }: { searchParams: Prom
       <Card pad={false}>
         <table className="gw-table">
           <thead>
-            <tr><th>Aula</th><th>Professor</th><th>Data/Hora</th><th>Alunos</th><th>Nível</th><th>Status</th></tr>
+            <tr><th>Aula</th><th>Professor</th><th>Data/Hora</th><th>Alunos</th><th>Nível</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>
             {lessons.length === 0 ? (
-              <tr><td colSpan={6} style={{ textAlign: "center", padding: 32, color: "var(--muted)" }}>Nenhuma aula encontrada.</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: "center", padding: 32, color: "var(--muted)" }}>Nenhuma aula encontrada.</td></tr>
             ) : (
               lessons.map((l) => (
                 <tr key={l.id}>
@@ -72,6 +73,7 @@ export default async function LessonsPage({ searchParams }: { searchParams: Prom
                   </td>
                   <td><Badge tone="slate">{LEVEL[l.level]}</Badge></td>
                   <td><Badge tone={STATUS[l.status]?.tone ?? "slate"} dot>{STATUS[l.status]?.label ?? l.status}</Badge></td>
+                  <td style={{ textAlign: "right" }}><LessonActions lessonId={l.id} status={l.status} /></td>
                 </tr>
               ))
             )}

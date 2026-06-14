@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { Eyebrow } from "@/components/gw/primitives";
 import { useMobileNav } from "@/components/dashboard/mobile-nav";
-import { Search, Bell, LogOut, Menu } from "lucide-react";
+import { Bell, LogOut, Menu } from "lucide-react";
 
 const TITLES: Record<string, { title: string; sub?: string }> = {
   "/admin": { title: "Dashboard", sub: "Visão geral do mês" },
@@ -28,6 +28,7 @@ const TITLES: Record<string, { title: string; sub?: string }> = {
   "/admin/users": { title: "Usuários", sub: "Acesso e permissões" },
   "/student": { title: "Olá! 👋", sub: "Portal do aluno" },
   "/student/courses": { title: "Cursos", sub: "Sua trilha de aprendizado" },
+  "/student/lessons": { title: "Aulas", sub: "Suas aulas agendadas" },
   "/student/exercises": { title: "Exercícios", sub: "Pratique vocabulário e gramática" },
   "/student/tutor": { title: "Tutor de Inglês", sub: "Powered by IA · Pratique a qualquer hora" },
   "/student/certificates": { title: "Certificados", sub: "Suas conquistas" },
@@ -58,16 +59,10 @@ export function Topbar() {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div className="gw-search">
-          <Search size={17} color="var(--muted)" />
-          <input placeholder="Buscar..." />
-          <kbd>⌘K</kbd>
-        </div>
-        <button className="gw-icon-btn" title="Notificações">
+        <button className="gw-icon-btn" title="Notificações" aria-label="Notificações">
           <Bell size={19} />
-          <span className="gw-badge-dot" />
         </button>
-        <button className="gw-icon-btn" title="Sair" onClick={() => signOut({ callbackUrl: "/login" })}>
+        <button className="gw-icon-btn" title="Sair" aria-label="Sair" onClick={() => signOut({ callbackUrl: "/login" })}>
           <LogOut size={19} />
         </button>
       </div>
