@@ -2,13 +2,21 @@
 // npm install --save-dev prisma dotenv
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
+import { assertDatabaseTarget } from "./src/lib/db-target";
+
+// Guard de isolamento também no caminho do CLI (prisma db push/generate):
+// db push aplica DDL — não pode mirar o banco de outro projeto por engano.
+const databaseUrl = process.env["DATABASE_URL"];
+assertDatabaseTarget(databaseUrl);
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    // Prisma 7 lê o comando de seed daqui (NÃO de package.json `prisma.seed`).
+    seed: "ts-node --project prisma/tsconfig.seed.json prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: databaseUrl,
   },
 });

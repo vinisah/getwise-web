@@ -69,7 +69,7 @@ No terminal local, dentro de `web/`, apontando para o Neon **direct**:
 
 ```bash
 DATABASE_URL="<neon-direct>" npx prisma db push
-DATABASE_URL="<neon-direct>" npx ts-node --compiler-options '{"module":"CommonJS"}' prisma/seed.ts
+DATABASE_URL="<neon-direct>" npm run db:seed
 ```
 
 Confira (opcional): `plans.price` deve ser `39700 / 54700 / 79700` (valores em centavos).

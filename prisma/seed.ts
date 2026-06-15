@@ -2,6 +2,11 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
+import { assertDatabaseTarget } from "../src/lib/db-target";
+
+// Mesmo guard do app runtime: o seed ESCREVE dados — não pode rodar contra o
+// banco de outro projeto se a DATABASE_URL estiver apontando errado.
+assertDatabaseTarget(process.env.DATABASE_URL);
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });

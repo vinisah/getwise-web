@@ -1,7 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { assertDatabaseTarget } from "./db-target";
 
 function createPrismaClient() {
+  assertDatabaseTarget(process.env.DATABASE_URL);
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
   return new PrismaClient({
     adapter,
