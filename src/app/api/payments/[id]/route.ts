@@ -85,21 +85,35 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
 
     if (!result.payment) return NextResponse.json({ error: "Mensalidade não encontrada" }, { status: 404 });
     if (result.changed) {
-      await audit({ userId: session.user.id, action: "PAYMENT_UPDATED", entity: "Payment", entityId: id, payload: { status, amountPaid: charges.total } });
+      await audit({
+        userId: session.user.id,
+        action: "PAYMENT_UPDATED",
+        entity: "Payment",
+        entityId: id,
+        payload: { status, amountPaid: charges.total },
+      });
     }
     return NextResponse.json(result.payment);
   }
 
-  // Volta a PENDENTE: limpa baixa + remove a receita vinculada.
+  // Volta a PENDENTE: limpa baixa + remove a receita vinculada. Também zera os campos de boleto
+  // (chargeId/boletoUrl/boletoLine) — senão a mensalidade nunca seria re-cobrada pelo gerador
+  // (filtra chargeId:null) e um reenvio do webhook do Asaas re-daria baixa (acha por chargeId).
   const updated = await prisma.$transaction(async (tx) => {
     const up = await tx.payment.update({
       where: { id },
-      data: { status: "PENDING", paidAt: null, amountPaid: null },
+      data: { status: "PENDING", paidAt: null, amountPaid: null, chargeId: null, boletoUrl: null, boletoLine: null },
     });
     await tx.financialTransaction.deleteMany({ where: { reference } });
     return up;
   });
 
-  await audit({ userId: session.user.id, action: "PAYMENT_UPDATED", entity: "Payment", entityId: id, payload: { status } });
+  await audit({
+    userId: session.user.id,
+    action: "PAYMENT_UPDATED",
+    entity: "Payment",
+    entityId: id,
+    payload: { status },
+  });
   return NextResponse.json(updated);
 });

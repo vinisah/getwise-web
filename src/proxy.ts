@@ -8,10 +8,12 @@ export async function proxy(req: NextRequest) {
 
   const isRoot = pathname === "/";
   const isProtected = AUTH_PATHS.some((p) => pathname.startsWith(p));
-  // /api/upload faz a própria auth (handleUpload do Blob): a fase de callback do Blob
-  // é server-to-server sem cookie, então não pode ser barrada aqui.
-  const isApiProtected =
-    pathname.startsWith("/api/") && !pathname.startsWith("/api/auth") && pathname !== "/api/upload";
+  // Rotas /api que se autoprotegem (não podem exigir cookie aqui):
+  // - /api/auth: NextAuth; /api/upload: handleUpload do Blob (callback HMAC server-to-server);
+  // - /api/webhooks/*: webhook do provedor de pagamento (valida token próprio, ex.: Asaas);
+  // - /api/billing/generate-due: cron de cobrança (valida CRON_SECRET) ou admin via cookie.
+  const PUBLIC_API = ["/api/auth", "/api/upload", "/api/webhooks/", "/api/billing/generate-due"];
+  const isApiProtected = pathname.startsWith("/api/") && !PUBLIC_API.some((p) => pathname.startsWith(p));
 
   if (isRoot || isProtected || isApiProtected) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });

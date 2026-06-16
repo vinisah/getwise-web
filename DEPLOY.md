@@ -49,16 +49,23 @@ git push -u origin main
    Build e Install command: **padrão** (o `postinstall` roda `prisma generate`).
 3. **Environment Variables** (aba Settings → Environment Variables, marque Production + Preview):
 
-   | Variável | Valor |
-   |---|---|
-   | `DATABASE_URL` | connection string **pooled** do Neon |
-   | `NEXTAUTH_SECRET` | o segredo do topo deste arquivo |
-   | `NEXTAUTH_URL` | `https://<projeto>.vercel.app` (preencha após o passo 5) |
-   | `NEXT_PUBLIC_APP_URL` | mesma URL acima |
-   | `GROQ_API_KEY` | chave **nova** rotacionada |
-   | `GROQ_MODEL` | `llama-3.3-70b-versatile` |
+   | Variável              | Valor                                                    |
+   | --------------------- | -------------------------------------------------------- |
+   | `DATABASE_URL`        | connection string **pooled** do Neon                     |
+   | `NEXTAUTH_SECRET`     | o segredo do topo deste arquivo                          |
+   | `NEXTAUTH_URL`        | `https://<projeto>.vercel.app` (preencha após o passo 5) |
+   | `NEXT_PUBLIC_APP_URL` | mesma URL acima                                          |
+   | `GROQ_API_KEY`        | chave **nova** rotacionada                               |
+   | `GROQ_MODEL`          | `llama-3.3-70b-versatile`                                |
+   | `BILLING_PROVIDER`    | `stub` (sem cobrança real) ou `asaas`                    |
+   | `ASAAS_API_KEY`       | chave do Asaas — só se `BILLING_PROVIDER=asaas`          |
+   | `ASAAS_ENV`           | `sandbox` ou `production`                                |
+   | `ASAAS_WEBHOOK_TOKEN` | token do webhook (header `asaas-access-token`)           |
+   | `CRON_SECRET`         | segredo do Vercel Cron que dispara a geração de boletos  |
 
-   SMTP fica vazio (contas demo já vêm verificadas). Mercado Pago não é necessário.
+   SMTP fica vazio (contas demo já vêm verificadas). Cobrança: deixe `BILLING_PROVIDER=stub`
+   (nada é emitido) até configurar o Asaas — ver seção **Cobrança / boleto (Asaas)** abaixo.
+
 4. **Deploy**.
 
 ---
@@ -95,11 +102,11 @@ Confira (opcional): `plans.price` deve ser `39700 / 54700 / 79700` (valores em c
 
 ## Contas demo
 
-| Perfil | E-mail | Senha |
-|---|---|---|
-| Admin | admin@getwise.com.br | admin123 |
+| Perfil    | E-mail                   | Senha      |
+| --------- | ------------------------ | ---------- |
+| Admin     | admin@getwise.com.br     | admin123   |
 | Professor | professor@getwise.com.br | teacher123 |
-| Aluno | aluno@getwise.com.br | student123 |
+| Aluno     | aluno@getwise.com.br     | student123 |
 
 ---
 
@@ -111,4 +118,35 @@ Confira (opcional): `plans.price` deve ser `39700 / 54700 / 79700` (valores em c
 - Banco usa `prisma db push` (não migrations versionadas) — migrar para `prisma migrate` antes de
   produção real.
 - Neon free tier suspende por inatividade → 1º acesso após pausa tem cold start (alguns segundos).
-- Pagamento online (Mercado Pago) ainda não foi construído.
+- Cobrança online: boleto via **Asaas** (provedor plugável). Com `BILLING_PROVIDER=stub` nada é
+  emitido; ao ativar, o Asaas gera o boleto e notifica o aluno por WhatsApp/e-mail. Mercado Pago descartado.
+
+---
+
+## 7. Cobrança / boleto (Asaas) — ativar quando quiser cobrar de verdade
+
+Por padrão `BILLING_PROVIDER=stub`: a matrícula cria a mensalidade PENDENTE mas **nenhum boleto é
+emitido** (apenas logado). Para ligar a cobrança real:
+
+1. Crie conta no **Asaas** (sandbox p/ testar) e pegue a **API key**.
+2. No painel Asaas, ative as **notificações por WhatsApp/e-mail** (é o Asaas que avisa o aluno).
+3. Cadastre o **webhook** apontando para `https://<projeto>.vercel.app/api/webhooks/asaas`,
+   definindo um token de acesso; coloque o mesmo valor em `ASAAS_WEBHOOK_TOKEN`.
+4. Na Vercel, sete `BILLING_PROVIDER=asaas`, `ASAAS_API_KEY`, `ASAAS_ENV`, `ASAAS_WEBHOOK_TOKEN`,
+   `CRON_SECRET` (Production + Preview) e **redeploy**.
+5. Alunos precisam ter **CPF** (`StudentProfile.cpf`) e **telefone** (`User.phone`) cadastrados —
+   o Asaas exige CPF para emitir boleto e usa o telefone p/ notificar no WhatsApp.
+
+**Geração automática:** o Vercel Cron chama `GET /api/billing/generate-due` 1×/dia (ver `vercel.json`)
+e emite boleto das mensalidades que vencem nos próximos 7 dias. Disparo manual (admin): `POST` na
+mesma rota. **Baixa automática:** o webhook `POST /api/webhooks/asaas` marca a mensalidade como paga
+(receita idempotente) quando o Asaas confirma o pagamento — ele **re-consulta o Asaas** antes de gravar
+(não confia no corpo do POST). Boleto pago em atraso já vem com multa 2% + juros 1%/mês (configurado na cobrança).
+
+**Notas:**
+
+- **`CRON_SECRET` é obrigatório** se quiser geração automática: sem ele o Vercel Cron recebe 401 e
+  **falha em silêncio** (nenhum boleto é gerado, sem alerta). Defina-o na Vercel.
+- A receita lançada é o **valor cheio** da mensalidade (o que o aluno paga). A **tarifa do Asaas**
+  por boleto **não** é lançada como despesa automaticamente — concilie pelo painel/extrato do Asaas.
+- Pagamento **parcial** não marca a mensalidade como paga (fica PENDENTE para revisão manual).

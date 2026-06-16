@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { ApiError, withErrorHandler, zodMessage } from "@/lib/api-error";
 import { requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 import { CreateEnrollmentSchema } from "@/lib/schemas";
+import { generateChargeForPayment } from "@/lib/billing/generate";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
@@ -63,8 +64,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const startMonth = iso ? Number(iso[2]) : start.getUTCMonth() + 1;
   const monthlyAmount = plan.price - discount; // centavos
 
-  // Atômico: cria a matrícula + a 1ª mensalidade PENDENTE (registro interno; sem Mercado Pago).
-  const enrollment = await prisma.$transaction(async (tx) => {
+  // Atômico: cria a matrícula + a 1ª mensalidade PENDENTE (registro interno; boleto gerado à parte).
+  const { enrollment, paymentId } = await prisma.$transaction(async (tx) => {
     const en = await tx.enrollment.create({
       data: {
         studentId,
@@ -77,7 +78,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       include: { student: true, plan: true },
     });
 
-    await tx.payment.create({
+    const pay = await tx.payment.create({
       data: {
         enrollmentId: en.id,
         studentId,
@@ -90,8 +91,23 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       },
     });
 
-    return en;
+    return { enrollment: en, paymentId: pay.id };
   });
+
+  // Gera o boleto da 1ª mensalidade em background — não bloqueia nem derruba a matrícula
+  // se o provedor falhar (com o Stub default vira no-op logado). O try externo protege
+  // contextos sem request scope (ex.: testes que invocam o handler direto), onde after() lança.
+  try {
+    after(async () => {
+      try {
+        await generateChargeForPayment(paymentId);
+      } catch (e) {
+        console.error("[billing] falha ao gerar boleto da matrícula", paymentId, e);
+      }
+    });
+  } catch {
+    /* fora de escopo de request — geração em background indisponível, segue sem bloquear */
+  }
 
   await audit({ userId: session.user.id, action: "CREATE_ENROLLMENT", entity: "Enrollment", entityId: enrollment.id });
 

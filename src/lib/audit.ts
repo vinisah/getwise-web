@@ -27,6 +27,7 @@ export type AuditAction =
   | "AI_CHAT"
   | "PAYMENT_CREATED"
   | "PAYMENT_UPDATED"
+  | "BILLING_GENERATE_DUE"
   | "REGISTER"
   | "VERIFY_EMAIL"
   | "PASSWORD_RESET"
@@ -66,9 +67,7 @@ export async function audit(params: AuditParams): Promise<void> {
         action: params.action,
         entity: params.entity,
         entityId: params.entityId ?? null,
-        payload: params.payload
-          ? (params.payload as import("@prisma/client").Prisma.InputJsonValue)
-          : undefined,
+        payload: params.payload ? (params.payload as import("@prisma/client").Prisma.InputJsonValue) : undefined,
         ip: params.ip ?? null,
       },
     });

@@ -495,8 +495,9 @@ model Payment {
   amountPaid     Int?          // centavos — valor efetivamente recebido (c/ multa+juros); null = não pago
   status         PaymentStatus @default(PENDING)
   method         PaymentMethod?
-  mercadoPagoId  String?       @unique
-  mercadoPagoUrl String?
+  chargeId       String?       @unique // id da cobrança no provedor (ex.: Asaas) — idempotência + reconciliação por webhook
+  boletoUrl      String?               // link do boleto/fatura (bankSlipUrl/invoiceUrl)
+  boletoLine     String?               // linha digitável do boleto
   description    String?
   dueDate        DateTime
   paidAt         DateTime?

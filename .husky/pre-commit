@@ -1,0 +1,19 @@
+# Get Wise — gate de commit (bônus; o gate garantido é o verificar.bat).
+# 1) Guardas de segurança: bloqueia chave privada e arquivo gigante acidental.
+# 2) Formata os arquivos alterados com Prettier (lint-staged).
+
+files=$(git diff --cached --name-only --diff-filter=ACM)
+for f in $files; do
+  [ -f "$f" ] || continue
+  if grep -lI "BEGIN [A-Z ]*PRIVATE KEY" "$f" >/dev/null 2>&1; then
+    echo "ERRO: possivel CHAVE PRIVADA em '$f' — commit abortado. Remova o segredo."
+    exit 1
+  fi
+  kb=$(du -k "$f" 2>/dev/null | cut -f1)
+  if [ -n "$kb" ] && [ "$kb" -gt 5120 ]; then
+    echo "ERRO: arquivo grande demais (>5MB): '$f' — commit abortado."
+    exit 1
+  fi
+done
+
+npx lint-staged
