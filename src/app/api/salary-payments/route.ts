@@ -5,6 +5,8 @@ import { audit } from "@/lib/audit";
 import { CreateSalaryPaymentSchema, MonthYearQuerySchema } from "@/lib/schemas";
 import { monthRangeBrasilia } from "@/lib/utils";
 import { calcPaymentBreakdown, PAYMENT_TYPE_LABEL } from "@/lib/payroll";
+import { categoryIdByName, SYSTEM_CATEGORY } from "@/lib/financial-categories";
+import { createNotification } from "@/lib/services/notifications";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
@@ -49,16 +51,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // Base do cálculo: bruto informado ou salário cadastrado.
   // O SERVIDOR calcula descontos/encargos — nunca confia em líquido do client.
   const baseGross = parsed.data.grossAmount ?? employee.salary;
-  const b = calcPaymentBreakdown(
-    type,
-    baseGross,
-    employee.dependents,
-    employee.contractType
-  );
+  const b = calcPaymentBreakdown(type, baseGross, employee.dependents, employee.contractType);
 
   const paidAt = isPaid ? new Date() : null;
   const label = PAYMENT_TYPE_LABEL[type];
   const ref = `${String(month).padStart(2, "0")}/${year}`;
+  // Categoria p/ o DRE (CSP — custo do serviço). Sem isso, a folha cai em "não classificado".
+  const salariosCatId = await categoryIdByName(SYSTEM_CATEGORY.SALARIOS);
   // Despesa ancorada no mês de competência (Brasília).
   const expenseDate = monthRangeBrasilia(year, month).gte;
   const charges = b.inss + b.irrf + b.fgts;
@@ -91,6 +90,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         date: expenseDate,
         isPaid,
         paidAt,
+        categoryId: salariosCatId,
         reference: `salary:${sp.id}`,
         createdBy: session.user.id,
       },
@@ -106,6 +106,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
           date: expenseDate,
           isPaid,
           paidAt,
+          categoryId: salariosCatId,
           reference: `salary-charges:${sp.id}`,
           createdBy: session.user.id,
         },
@@ -115,6 +116,22 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return sp;
   });
 
-  await audit({ userId: session.user.id, action: "CREATE_SALARY_PAYMENT", entity: "SalaryPayment", entityId: salaryPayment.id, payload: { type, gross: b.grossPaid, net: b.net } });
+  await audit({
+    userId: session.user.id,
+    action: "CREATE_SALARY_PAYMENT",
+    entity: "SalaryPayment",
+    entityId: salaryPayment.id,
+    payload: { type, gross: b.grossPaid, net: b.net },
+  });
+
+  // Avisa o admin que processou (folha não tem login de funcionário). Best-effort.
+  await createNotification({
+    userId: session.user.id,
+    type: "PAYROLL_PROCESSED",
+    title: "Folha processada",
+    body: `${label} de ${employee.name} — ${ref} registrada.`,
+    link: "/admin/payroll",
+  });
+
   return NextResponse.json(salaryPayment, { status: 201 });
 });

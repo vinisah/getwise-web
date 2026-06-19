@@ -1,9 +1,9 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { after } from "next/server";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getEffectiveUser } from "@/lib/effective-user";
+import { roleHome } from "@/lib/roles";
 import { isCourseUnlocked, getOrderedUnits, getCompletedUnitIds, isUnitUnlocked } from "@/lib/services/unlock";
 import { touchUnitAccess } from "@/lib/services/progress";
 import { Card, SectionHeader } from "@/components/gw/primitives";
@@ -15,9 +15,11 @@ import { ExerciseRunner } from "./exercise-runner";
 import { MaterialList } from "./material-list";
 
 export default async function UnitPage({ params }: { params: Promise<{ id: string; unitId: string }> }) {
-  const session = await getServerSession(authOptions);
-  const user = session?.user as { id: string; role: string } | undefined;
-  if (!user) redirect("/login");
+  // effective user: aluno real OU admin "vendo como" aluno (read-only).
+  const eff = await getEffectiveUser();
+  if (!eff) redirect("/login");
+  if (eff.role !== "STUDENT") redirect(roleHome(eff.role));
+  const user = { id: eff.id, role: eff.role as string };
 
   const { id: courseId, unitId } = await params;
 
@@ -64,14 +66,26 @@ export default async function UnitPage({ params }: { params: Promise<{ id: strin
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--gap)", maxWidth: 800 }}>
       <Link href={`/student/courses/${courseId}`}>
-        <Button variant="ghost" size="sm"><ArrowLeft size={15} /> {unit.module.course.title}</Button>
+        <Button variant="ghost" size="sm">
+          <ArrowLeft size={15} /> {unit.module.course.title}
+        </Button>
       </Link>
 
       <Card style={{ padding: 32 }}>
-        <div style={{ fontSize: 12, fontFamily: "var(--mono)", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)" }}>
+        <div
+          style={{
+            fontSize: 12,
+            fontFamily: "var(--mono)",
+            letterSpacing: ".1em",
+            textTransform: "uppercase",
+            color: "var(--muted)",
+          }}
+        >
           {unit.module.title} · Unidade {idx + 1} de {ordered.length}
         </div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--ink)", letterSpacing: "-.02em", marginTop: 8 }}>{unit.title}</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--ink)", letterSpacing: "-.02em", marginTop: 8 }}>
+          {unit.title}
+        </h1>
 
         {hasVideo && (
           <div style={{ marginTop: 20 }}>
@@ -102,7 +116,14 @@ export default async function UnitPage({ params }: { params: Promise<{ id: strin
       {/* Exercícios */}
       {unit.exercises.length > 0 && (
         <div>
-          <SectionHeader title="Exercícios" sub={requiredExercises.length > 0 ? `${requiredExercises.length} obrigatório(s) para concluir` : "Pratique para fixar"} />
+          <SectionHeader
+            title="Exercícios"
+            sub={
+              requiredExercises.length > 0
+                ? `${requiredExercises.length} obrigatório(s) para concluir`
+                : "Pratique para fixar"
+            }
+          />
           <ExerciseRunner
             exercises={unit.exercises.map((e) => ({
               id: e.id,

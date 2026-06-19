@@ -3,14 +3,28 @@ import { z } from "zod";
 import { withErrorHandler } from "@/lib/api-error";
 import { requireAuth } from "@/lib/api-auth";
 import { ApiError } from "@/lib/api-error";
+import { getEffectiveUser } from "@/lib/effective-user";
 import { CreateExerciseSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 
 const LevelEnum = z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]);
-const TypeEnum = z.enum(["MULTIPLE_CHOICE", "FILL_IN_BLANK", "TRUE_FALSE", "WRITING", "LISTENING", "WORD_MATCH", "TRANSLATION", "SENTENCE_ORDER", "DICTATION", "PRONUNCIATION"]);
+const TypeEnum = z.enum([
+  "MULTIPLE_CHOICE",
+  "FILL_IN_BLANK",
+  "TRUE_FALSE",
+  "WRITING",
+  "LISTENING",
+  "WORD_MATCH",
+  "TRANSLATION",
+  "SENTENCE_ORDER",
+  "DICTATION",
+  "PRONUNCIATION",
+]);
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAuth();
+  // Identidade efetiva: aluno real OU admin "vendo como" aluno (read-only).
+  const eff = await getEffectiveUser();
+  if (!eff) throw new ApiError(401, "Não autenticado");
 
   const { searchParams } = new URL(req.url);
   const rawLevel = searchParams.get("level");
@@ -30,9 +44,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     type = r.data;
   }
 
-  const profile = session.user.role === "STUDENT"
-    ? await prisma.studentProfile.findUnique({ where: { userId: session.user.id } })
-    : null;
+  const profile = eff.role === "STUDENT" ? await prisma.studentProfile.findUnique({ where: { userId: eff.id } }) : null;
 
   const exercises = await prisma.exercise.findMany({
     where: {
@@ -46,7 +58,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   // Aluno NÃO recebe gabarito na listagem — senão coleta correctAnswer de exercícios de
   // unidade (que contam na progressão) sem resolver. O gabarito vem da resposta do attempt,
   // gated por aprovação. Espelha a omissão de GET /api/exercises/[id].
-  if (session.user.role === "STUDENT") {
+  if (eff.role === "STUDENT") {
     const safe = exercises.map((ex) => {
       const { correctAnswer: _c, explanation: _e, ...rest } = ex;
       void _c;
@@ -68,13 +80,24 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const parsed = CreateExerciseSchema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Dados inválidos" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
   }
 
-  const { title, description, type, level, content, correctAnswer, explanation, points, timeLimit, lessonId, unitId, isRequired, order } = parsed.data;
+  const {
+    title,
+    description,
+    type,
+    level,
+    content,
+    correctAnswer,
+    explanation,
+    points,
+    timeLimit,
+    lessonId,
+    unitId,
+    isRequired,
+    order,
+  } = parsed.data;
 
   const exercise = await prisma.exercise.create({
     data: {
@@ -83,7 +106,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       type,
       level,
       content: content as import("@prisma/client").Prisma.InputJsonValue,
-      correctAnswer: correctAnswer !== undefined ? (correctAnswer as import("@prisma/client").Prisma.InputJsonValue) : undefined,
+      correctAnswer:
+        correctAnswer !== undefined ? (correctAnswer as import("@prisma/client").Prisma.InputJsonValue) : undefined,
       explanation: explanation || null,
       points: points ?? 10,
       timeLimit: timeLimit ?? null,

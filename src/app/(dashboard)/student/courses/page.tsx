@@ -1,20 +1,26 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getEffectiveUser } from "@/lib/effective-user";
+import { roleHome } from "@/lib/roles";
 import { Card, Badge, SectionHeader } from "@/components/gw/primitives";
 import { BookOpen, Lock, CheckCircle, ArrowRight } from "lucide-react";
 
 const LEVEL_LABELS: Record<string, string> = {
-  A1: "A1 — Iniciante", A2: "A2 — Básico", B1: "B1 — Intermediário",
-  B2: "B2 — Inter. Avançado", C1: "C1 — Avançado", C2: "C2 — Proficiente",
+  A1: "A1 — Iniciante",
+  A2: "A2 — Básico",
+  B1: "B1 — Intermediário",
+  B2: "B2 — Inter. Avançado",
+  C1: "C1 — Avançado",
+  C2: "C2 — Proficiente",
 };
 
 export default async function StudentCoursesPage() {
-  const session = await getServerSession(authOptions);
-  const user = session?.user as { id: string; role: string } | undefined;
-  if (!user) redirect("/login");
+  // effective user: aluno real OU admin "vendo como" aluno (read-only).
+  const eff = await getEffectiveUser();
+  if (!eff) redirect("/login");
+  if (eff.role !== "STUDENT") redirect(roleHome(eff.role));
+  const user = { id: eff.id, role: eff.role as string };
 
   const courses = await prisma.course.findMany({
     where: { isActive: true },
@@ -29,8 +35,15 @@ export default async function StudentCoursesPage() {
   const courseIds = courses.map((c) => c.id);
   const [certs, moduleUnitCounts, completedGroups] = await Promise.all([
     prisma.certificate.findMany({ where: { userId: user.id }, select: { courseId: true } }),
-    prisma.module.findMany({ where: { courseId: { in: courseIds } }, select: { courseId: true, _count: { select: { units: true } } } }),
-    prisma.userUnitProgress.groupBy({ by: ["courseId"], where: { userId: user.id, courseId: { in: courseIds }, completed: true }, _count: { _all: true } }),
+    prisma.module.findMany({
+      where: { courseId: { in: courseIds } },
+      select: { courseId: true, _count: { select: { units: true } } },
+    }),
+    prisma.userUnitProgress.groupBy({
+      by: ["courseId"],
+      where: { userId: user.id, courseId: { in: courseIds }, completed: true },
+      _count: { _all: true },
+    }),
   ]);
   const certSet = new Set(certs.map((c) => c.courseId));
   const totalUnits = new Map<string, number>();
@@ -71,7 +84,18 @@ export default async function StudentCoursesPage() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ width: 44, height: 44, borderRadius: "var(--r-sm)", background: "var(--accent-soft)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: "var(--r-sm)",
+                      background: "var(--accent-soft)",
+                      color: "var(--accent)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
                     {unlocked ? <BookOpen size={22} /> : <Lock size={20} />}
                   </div>
                   <Badge tone="slate">{LEVEL_LABELS[course.level]}</Badge>
@@ -79,7 +103,9 @@ export default async function StudentCoursesPage() {
                 <div>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)" }}>{course.title}</h3>
                   {course.description && (
-                    <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4, lineHeight: 1.5 }}>{course.description}</p>
+                    <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4, lineHeight: 1.5 }}>
+                      {course.description}
+                    </p>
                   )}
                 </div>
 
@@ -92,20 +118,45 @@ export default async function StudentCoursesPage() {
                 <div style={{ marginTop: "auto" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
                     <span style={{ color: "var(--muted)" }}>{course._count.modules} módulo(s)</span>
-                    <span style={{ fontWeight: 700, color: completed ? "var(--success)" : "var(--ink)" }}>{progress}%</span>
+                    <span style={{ fontWeight: 700, color: completed ? "var(--success)" : "var(--ink)" }}>
+                      {progress}%
+                    </span>
                   </div>
-                  <div className="gw-meter"><span style={{ width: `${progress}%`, background: completed ? "var(--success)" : "var(--accent)" }} /></div>
+                  <div className="gw-meter">
+                    <span
+                      style={{ width: `${progress}%`, background: completed ? "var(--success)" : "var(--accent)" }}
+                    />
+                  </div>
                 </div>
 
                 {unlocked && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, color: completed ? "var(--success)" : "var(--accent)", fontSize: 13, fontWeight: 600 }}>
-                    {completed ? <><CheckCircle size={15} /> Concluído</> : <>Continuar <ArrowRight size={15} /></>}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      color: completed ? "var(--success)" : "var(--accent)",
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {completed ? (
+                      <>
+                        <CheckCircle size={15} /> Concluído
+                      </>
+                    ) : (
+                      <>
+                        Continuar <ArrowRight size={15} />
+                      </>
+                    )}
                   </div>
                 )}
               </Card>
             );
             return unlocked ? (
-              <Link key={course.id} href={`/student/courses/${course.id}`} style={{ textDecoration: "none" }}>{inner}</Link>
+              <Link key={course.id} href={`/student/courses/${course.id}`} style={{ textDecoration: "none" }}>
+                {inner}
+              </Link>
             ) : (
               <div key={course.id}>{inner}</div>
             );

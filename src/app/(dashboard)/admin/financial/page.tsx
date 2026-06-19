@@ -12,7 +12,18 @@ import { TransactionActions } from "./transaction-actions";
 import { GenerateRecurringButton } from "./generate-recurring-button";
 import { TrendingUp, TrendingDown, Wallet, Plus, RefreshCw } from "lucide-react";
 
-export default async function FinancialPage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string; type?: string }> }) {
+const METHOD_LABEL: Record<string, string> = {
+  PIX: "Pix",
+  CREDIT_CARD: "Crédito",
+  DEBIT_CARD: "Débito",
+  BOLETO: "Boleto",
+};
+
+export default async function FinancialPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string; year?: string; type?: string }>;
+}) {
   const session = await getServerSession(authOptions);
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
@@ -36,8 +47,14 @@ export default async function FinancialPage({ searchParams }: { searchParams: Pr
       include: { category: true },
       orderBy: { date: "desc" },
     }),
-    prisma.financialTransaction.aggregate({ where: { date: { gte, lte }, type: "INCOME", isPaid: true }, _sum: { amount: true } }),
-    prisma.financialTransaction.aggregate({ where: { date: { gte, lte }, type: "EXPENSE", isPaid: true }, _sum: { amount: true } }),
+    prisma.financialTransaction.aggregate({
+      where: { date: { gte, lte }, type: "INCOME", isPaid: true },
+      _sum: { amount: true },
+    }),
+    prisma.financialTransaction.aggregate({
+      where: { date: { gte, lte }, type: "EXPENSE", isPaid: true },
+      _sum: { amount: true },
+    }),
   ]);
 
   // Valores em centavos (Int) — soma exata.
@@ -49,16 +66,30 @@ export default async function FinancialPage({ searchParams }: { searchParams: Pr
   const summary = [
     { icon: TrendingUp, label: "Receitas", value: income, color: "var(--success)", border: "var(--success)" },
     { icon: TrendingDown, label: "Despesas", value: expenses, color: "var(--danger)", border: "var(--danger)" },
-    { icon: Wallet, label: "Saldo", value: balance, color: balance >= 0 ? "var(--accent)" : "var(--amber)", border: balance >= 0 ? "var(--accent)" : "var(--amber)" },
+    {
+      icon: Wallet,
+      label: "Saldo",
+      value: balance,
+      color: balance >= 0 ? "var(--accent)" : "var(--amber)",
+      border: balance >= 0 ? "var(--accent)" : "var(--amber)",
+    },
   ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--gap)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <p style={{ fontSize: 13.5, color: "var(--muted)", textTransform: "capitalize" }}>{monthName} de {year}</p>
+      <div
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}
+      >
+        <p style={{ fontSize: 13.5, color: "var(--muted)", textTransform: "capitalize" }}>
+          {monthName} de {year}
+        </p>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <GenerateRecurringButton month={month} year={year} />
-          <Link href="/admin/financial/new"><Button variant="accent"><Plus size={17} /> Nova transação</Button></Link>
+          <Link href="/admin/financial/new">
+            <Button variant="accent">
+              <Plus size={17} /> Nova transação
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -69,7 +100,9 @@ export default async function FinancialPage({ searchParams }: { searchParams: Pr
               <s.icon size={16} color={s.color} />
               <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600 }}>{s.label}</span>
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: s.color, letterSpacing: "-.02em" }}>{fmtCents(s.value)}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: s.color, letterSpacing: "-.02em" }}>
+              {fmtCents(s.value)}
+            </div>
           </Card>
         ))}
       </div>
@@ -102,37 +135,117 @@ export default async function FinancialPage({ searchParams }: { searchParams: Pr
       </div>
 
       <div style={{ display: "flex", gap: 8 }}>
-        <Link href={`/admin/financial?month=${month}&year=${year}`}><Button variant={!typeFilter ? "default" : "outline"} size="sm">Todos</Button></Link>
-        <Link href={`/admin/financial?month=${month}&year=${year}&type=INCOME`}><Button variant={typeFilter === "INCOME" ? "success" : "outline"} size="sm">Receitas</Button></Link>
-        <Link href={`/admin/financial?month=${month}&year=${year}&type=EXPENSE`}><Button variant={typeFilter === "EXPENSE" ? "destructive" : "outline"} size="sm">Despesas</Button></Link>
+        <Link href={`/admin/financial?month=${month}&year=${year}`}>
+          <Button variant={!typeFilter ? "default" : "outline"} size="sm">
+            Todos
+          </Button>
+        </Link>
+        <Link href={`/admin/financial?month=${month}&year=${year}&type=INCOME`}>
+          <Button variant={typeFilter === "INCOME" ? "success" : "outline"} size="sm">
+            Receitas
+          </Button>
+        </Link>
+        <Link href={`/admin/financial?month=${month}&year=${year}&type=EXPENSE`}>
+          <Button variant={typeFilter === "EXPENSE" ? "destructive" : "outline"} size="sm">
+            Despesas
+          </Button>
+        </Link>
       </div>
 
       <Card pad={false}>
         <table className="gw-table">
           <thead>
-            <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th style={{ textAlign: "right" }}>Valor</th><th>Status</th><th style={{ textAlign: "right" }}>Ações</th></tr>
+            <tr>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th>Categoria</th>
+              <th>Tipo</th>
+              <th>Método</th>
+              <th style={{ textAlign: "right" }}>Valor</th>
+              <th>Status</th>
+              <th style={{ textAlign: "right" }}>Ações</th>
+            </tr>
           </thead>
           <tbody>
             {transactions.length === 0 ? (
-              <tr><td colSpan={7} style={{ textAlign: "center", padding: 32, color: "var(--muted)" }}>Nenhuma transação no período.</td></tr>
+              <tr>
+                <td colSpan={8} style={{ textAlign: "center", padding: 32, color: "var(--muted)" }}>
+                  Nenhuma transação no período.
+                </td>
+              </tr>
             ) : (
               transactions.map((t) => (
                 <tr key={t.id}>
-                  <td><span style={{ fontSize: 13, color: "var(--ink-2)" }}>{formatDate(t.date)}</span></td>
                   <td>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 13, color: "var(--ink-2)" }}>{formatDate(t.date)}</span>
+                  </td>
+                  <td>
+                    <div
+                      style={{
+                        fontSize: 13.5,
+                        fontWeight: 600,
+                        color: "var(--ink)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 7,
+                      }}
+                    >
                       {t.description}
-                      {t.isRecurring && <RefreshCw size={12} color="var(--muted)" aria-label="Recorrente" />}
+                      {t.isRecurring && (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 3,
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            color: "var(--amber)",
+                            background: "color-mix(in srgb, var(--amber) 12%, transparent)",
+                            padding: "1px 6px",
+                            borderRadius: 6,
+                          }}
+                        >
+                          <RefreshCw size={10} /> recorrente
+                        </span>
+                      )}
                     </div>
                     {t.reference && <div style={{ fontSize: 11.5, color: "var(--muted)" }}>Ref: {t.reference}</div>}
                   </td>
-                  <td>{t.category ? <Badge tone="slate">{t.category.name}</Badge> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
-                  <td><Badge tone={t.type === "INCOME" ? "green" : "red"}>{t.type === "INCOME" ? "Receita" : "Despesa"}</Badge></td>
-                  <td style={{ textAlign: "right", fontWeight: 700, color: t.type === "INCOME" ? "var(--success)" : "var(--danger)" }}>
-                    {t.type === "INCOME" ? "+" : "-"}{fmtCents(t.amount)}
+                  <td>
+                    {t.category ? (
+                      <Badge tone="slate">{t.category.name}</Badge>
+                    ) : (
+                      <span style={{ color: "var(--muted)" }}>—</span>
+                    )}
                   </td>
-                  <td><Badge tone={t.isPaid ? "green" : "amber"} dot>{t.isPaid ? "Pago" : "Pendente"}</Badge></td>
-                  <td><TransactionActions id={t.id} /></td>
+                  <td>
+                    <Badge tone={t.type === "INCOME" ? "green" : "red"}>
+                      {t.type === "INCOME" ? "Receita" : "Despesa"}
+                    </Badge>
+                  </td>
+                  <td>
+                    <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
+                      {t.paymentMethod ? (METHOD_LABEL[t.paymentMethod] ?? t.paymentMethod) : "—"}
+                    </span>
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      fontWeight: 700,
+                      color: t.type === "INCOME" ? "var(--success)" : "var(--danger)",
+                    }}
+                  >
+                    {t.type === "INCOME" ? "+" : "-"}
+                    {fmtCents(t.amount)}
+                  </td>
+                  <td>
+                    <Badge tone={t.isPaid ? "green" : "amber"} dot>
+                      {t.isPaid ? "Pago" : "Pendente"}
+                    </Badge>
+                  </td>
+                  <td>
+                    <TransactionActions id={t.id} />
+                  </td>
                 </tr>
               ))
             )}

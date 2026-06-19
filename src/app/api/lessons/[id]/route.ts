@@ -4,6 +4,7 @@ import { requireAuth, requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 import { UpdateLessonSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
+import { awardLesson } from "@/lib/services/gamification";
 import type { Prisma } from "@prisma/client";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -20,7 +21,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
     throw new ApiError(403, "Não autorizado");
   }
 
-  const lesson = await prisma.lesson.findUnique({ where: { id }, select: { id: true, teacherId: true } });
+  const lesson = await prisma.lesson.findUnique({ where: { id }, select: { id: true, teacherId: true, status: true } });
   if (!lesson) return NextResponse.json({ error: "Aula não encontrada" }, { status: 404 });
 
   // Professor só edita a própria aula.
@@ -34,6 +35,16 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
   }
   const d = parsed.data;
 
+  // Estados terminais (COMPLETED/CANCELLED) são finais: não reabrir. Sem isso, alternar
+  // COMPLETED→SCHEDULED→COMPLETED via API crua reprocessaria XP de aula a cada ciclo.
+  if (
+    d.status !== undefined &&
+    d.status !== lesson.status &&
+    (lesson.status === "COMPLETED" || lesson.status === "CANCELLED")
+  ) {
+    throw new ApiError(400, "Aula já finalizada — não é possível alterar o status.");
+  }
+
   const data: Prisma.LessonUpdateInput = {};
   if (d.title !== undefined) data.title = d.title;
   if (d.description !== undefined) data.description = d.description || null;
@@ -44,16 +55,41 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
   if (d.status !== undefined) data.status = d.status;
   if (d.notes !== undefined) data.notes = d.notes || null;
 
+  // Transição p/ concluída (1ª vez) → base p/ XP de aula idempotente.
+  const completing = d.status === "COMPLETED" && lesson.status !== "COMPLETED";
+
   const updated = await prisma.$transaction(async (tx) => {
     const up = await tx.lesson.update({ where: { id }, data });
     // Cancelar a aula cancela também as reservas dos alunos.
     if (d.status === "CANCELLED") {
       await tx.lessonBooking.updateMany({ where: { lessonId: id }, data: { status: "CANCELLED" } });
     }
+    // Concluir a aula conclui as reservas não canceladas (espelha o status).
+    if (completing) {
+      await tx.lessonBooking.updateMany({
+        where: { lessonId: id, status: { not: "CANCELLED" } },
+        data: { status: "COMPLETED" },
+      });
+    }
     return up;
   });
 
-  await audit({ userId: session.user.id, action: "UPDATE_LESSON", entity: "Lesson", entityId: id, payload: { status: d.status } });
+  // Gamificação: XP de aula aos alunos presentes — só na transição p/ COMPLETED. Best-effort.
+  if (completing) {
+    const bookings = await prisma.lessonBooking.findMany({
+      where: { lessonId: id, status: "COMPLETED" },
+      select: { studentId: true },
+    });
+    await Promise.all(bookings.map((b) => awardLesson(b.studentId).catch(() => {})));
+  }
+
+  await audit({
+    userId: session.user.id,
+    action: "UPDATE_LESSON",
+    entity: "Lesson",
+    entityId: id,
+    payload: { status: d.status },
+  });
   return NextResponse.json(updated);
 });
 

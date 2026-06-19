@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { createCertificateCode } from "../tokens";
+import { createNotification } from "./notifications";
 
 interface IssueParams {
   userId: string;
@@ -23,7 +24,7 @@ export async function issueCertificate(params: IssueParams) {
   // Gera código único com retry no próprio create (cobre a race entre check e insert).
   for (let i = 0; i < 6; i++) {
     try {
-      return await prisma.certificate.create({
+      const created = await prisma.certificate.create({
         data: {
           certificateId: createCertificateCode(),
           userId: params.userId,
@@ -33,6 +34,15 @@ export async function issueCertificate(params: IssueParams) {
           completionDate: new Date(),
         },
       });
+      // Notifica o aluno só na 1ª emissão (este branch só roda na criação). Best-effort.
+      await createNotification({
+        userId: params.userId,
+        type: "CERTIFICATE_ISSUED",
+        title: "Certificado emitido 🎓",
+        body: `Você concluiu ${params.courseName}. Baixe seu certificado.`,
+        link: "/student/certificates",
+      });
+      return created;
     } catch (e) {
       // P2002 em certificateId → colisão de código: tenta de novo.
       // P2002 em [userId,courseId] → já emitido concorrentemente: retorna o existente.
@@ -77,12 +87,20 @@ export async function renderCertificatePdf(cert: CertData): Promise<Uint8Array> 
 
   // Borda
   page.drawRectangle({
-    x: 24, y: 24, width: width - 48, height: height - 48,
-    borderColor: accent, borderWidth: 2,
+    x: 24,
+    y: 24,
+    width: width - 48,
+    height: height - 48,
+    borderColor: accent,
+    borderWidth: 2,
   });
   page.drawRectangle({
-    x: 32, y: 32, width: width - 64, height: height - 64,
-    borderColor: navy, borderWidth: 0.5,
+    x: 32,
+    y: 32,
+    width: width - 64,
+    height: height - 64,
+    borderColor: navy,
+    borderWidth: 0.5,
   });
 
   const center = (text: string, y: number, size: number, f = font, color = navy) => {
@@ -98,17 +116,26 @@ export async function renderCertificatePdf(cert: CertData): Promise<Uint8Array> 
   center(cert.courseName, height - 335, 24, fontBold, accent);
 
   const dateStr = cert.completionDate.toLocaleDateString("pt-BR", {
-    day: "2-digit", month: "long", year: "numeric",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
   });
   center(`Concluído em ${dateStr}`, height - 400, 13, font, navy);
 
   // Rodapé: ID
   page.drawText(`Certificado: ${cert.certificateId}`, {
-    x: 48, y: 50, size: 10, font, color: muted,
+    x: 48,
+    y: 50,
+    size: 10,
+    font,
+    color: muted,
   });
   page.drawText("getwise.com.br", {
     x: width - 48 - font.widthOfTextAtSize("getwise.com.br", 10),
-    y: 50, size: 10, font, color: muted,
+    y: 50,
+    size: 10,
+    font,
+    color: muted,
   });
 
   return doc.save();

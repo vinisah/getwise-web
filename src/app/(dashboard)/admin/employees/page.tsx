@@ -12,6 +12,10 @@ import { Plus, Banknote } from "lucide-react";
 
 const CONTRACT_LABEL: Record<string, string> = { CLT: "CLT", PJ: "PJ", HOURLY: "Horista" };
 
+/** CPF 11 dígitos → 000.000.000-00; senão devolve cru ou —. */
+const fmtCpf = (c: string | null) =>
+  c && /^\d{11}$/.test(c) ? c.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : c || "—";
+
 export default async function EmployeesPage() {
   const session = await getServerSession(authOptions);
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
@@ -28,24 +32,49 @@ export default async function EmployeesPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--gap)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+      <div
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}
+      >
         <p style={{ fontSize: 13.5, color: "var(--muted)" }}>
-          {employees.filter((e) => e.isActive).length} ativo(s) · Custo real da folha (c/ encargos e provisões): <b style={{ color: "var(--ink)" }}>{fmtCents(totalCost)}</b>
+          {employees.filter((e) => e.isActive).length} ativo(s) · Custo real da folha (c/ encargos e provisões):{" "}
+          <b style={{ color: "var(--ink)" }}>{fmtCents(totalCost)}</b>
         </p>
         <div style={{ display: "flex", gap: 8 }}>
-          <Link href="/admin/payroll"><Button variant="outline"><Banknote size={17} /> Folha do mês</Button></Link>
-          <Link href="/admin/employees/new"><Button variant="accent"><Plus size={17} /> Novo funcionário</Button></Link>
+          <Link href="/admin/payroll">
+            <Button variant="outline">
+              <Banknote size={17} /> Folha do mês
+            </Button>
+          </Link>
+          <Link href="/admin/employees/new">
+            <Button variant="accent">
+              <Plus size={17} /> Novo funcionário
+            </Button>
+          </Link>
         </div>
       </div>
 
       <Card pad={false}>
         <table className="gw-table">
           <thead>
-            <tr><th>Funcionário</th><th>Cargo</th><th>Contrato</th><th>Salário</th><th>Custo real</th><th>Admissão</th><th>Últ. pgto.</th><th>Status</th></tr>
+            <tr>
+              <th>Funcionário</th>
+              <th>Cargo</th>
+              <th>Contrato</th>
+              <th>CPF</th>
+              <th>Salário</th>
+              <th>Custo real</th>
+              <th>Admissão</th>
+              <th>Últ. pgto.</th>
+              <th>Status</th>
+            </tr>
           </thead>
           <tbody>
             {employees.length === 0 ? (
-              <tr><td colSpan={8} style={{ textAlign: "center", padding: 32, color: "var(--muted)" }}>Nenhum funcionário cadastrado.</td></tr>
+              <tr>
+                <td colSpan={9} style={{ textAlign: "center", padding: 32, color: "var(--muted)" }}>
+                  Nenhum funcionário cadastrado.
+                </td>
+              </tr>
             ) : (
               employees.map((emp) => {
                 const last = emp.salaryPayments[0];
@@ -61,13 +90,42 @@ export default async function EmployeesPage() {
                         </div>
                       </div>
                     </td>
-                    <td><span style={{ fontSize: 13, color: "var(--ink-2)" }}>{emp.role}</span></td>
-                    <td><Badge tone={emp.contractType === "CLT" ? "blue" : "slate"}>{CONTRACT_LABEL[emp.contractType]}</Badge></td>
-                    <td><span style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)" }}>{fmtCents(emp.salary)}</span></td>
-                    <td><span style={{ fontSize: 14, fontWeight: 700, color: "var(--brand)" }}>{fmtCents(cost)}</span></td>
-                    <td><span style={{ fontSize: 13, color: "var(--ink-2)" }}>{formatDate(emp.startDate)}</span></td>
-                    <td>{last ? <Badge tone={last.isPaid ? "green" : "amber"} dot>{last.month}/{last.year}</Badge> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
-                    <td><Badge tone={emp.isActive ? "green" : "slate"} dot>{emp.isActive ? "Ativo" : "Inativo"}</Badge></td>
+                    <td>
+                      <span style={{ fontSize: 13, color: "var(--ink-2)" }}>{emp.role}</span>
+                    </td>
+                    <td>
+                      <Badge tone={emp.contractType === "CLT" ? "blue" : "slate"}>
+                        {CONTRACT_LABEL[emp.contractType]}
+                      </Badge>
+                    </td>
+                    <td>
+                      <span style={{ fontSize: 12.5, color: "var(--ink-2)", fontVariantNumeric: "tabular-nums" }}>
+                        {fmtCpf(emp.cpf)}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)" }}>{fmtCents(emp.salary)}</span>
+                    </td>
+                    <td>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "var(--brand)" }}>{fmtCents(cost)}</span>
+                    </td>
+                    <td>
+                      <span style={{ fontSize: 13, color: "var(--ink-2)" }}>{formatDate(emp.startDate)}</span>
+                    </td>
+                    <td>
+                      {last ? (
+                        <Badge tone={last.isPaid ? "green" : "amber"} dot>
+                          {last.month}/{last.year}
+                        </Badge>
+                      ) : (
+                        <span style={{ color: "var(--muted)" }}>—</span>
+                      )}
+                    </td>
+                    <td>
+                      <Badge tone={emp.isActive ? "green" : "slate"} dot>
+                        {emp.isActive ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </td>
                   </tr>
                 );
               })

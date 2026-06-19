@@ -1,12 +1,8 @@
 import { prisma } from "../prisma";
 import { ApiError } from "../api-error";
 import { issueCertificate } from "./certificate";
-import {
-  getOrderedUnits,
-  getCompletedUnitIds,
-  isUnitUnlocked,
-  isCourseUnlocked,
-} from "./unlock";
+import { awardUnit } from "./gamification";
+import { getOrderedUnits, getCompletedUnitIds, isUnitUnlocked, isCourseUnlocked } from "./unlock";
 
 export interface CompleteUnitResult {
   unitId: string;
@@ -27,11 +23,7 @@ export interface CompleteUnitResult {
  * Se 100% das unidades concluídas → emite certificado automaticamente.
  * Salva `lastAccess` (progresso em tempo real).
  */
-export async function completeUnit(
-  userId: string,
-  userName: string,
-  unitId: string
-): Promise<CompleteUnitResult> {
+export async function completeUnit(userId: string, userName: string, unitId: string): Promise<CompleteUnitResult> {
   const unit = await prisma.unit.findUnique({
     where: { id: unitId },
     include: { module: { include: { course: true } } },
@@ -66,6 +58,13 @@ export async function completeUnit(
     throw new ApiError(403, "Conclua todos os exercícios obrigatórios antes de finalizar a unidade");
   }
 
+  // Transição p/ concluída? (antes de gravar) — base p/ XP idempotente.
+  const prior = await prisma.userUnitProgress.findUnique({
+    where: { userId_unitId: { userId, unitId } },
+    select: { completed: true },
+  });
+  const newlyCompleted = !prior?.completed;
+
   // Idempotente: upsert completed=true
   await prisma.userUnitProgress.upsert({
     where: { userId_unitId: { userId, unitId } },
@@ -78,6 +77,15 @@ export async function completeUnit(
       completedAt: new Date(),
     },
   });
+
+  // Gamificação: XP de unidade só na 1ª conclusão. Best-effort.
+  if (newlyCompleted) {
+    try {
+      await awardUnit(userId);
+    } catch {
+      // ignore — gamificação é secundária à conclusão
+    }
+  }
 
   // Recompute progresso
   completed.add(unitId);
@@ -111,4 +119,3 @@ export async function touchUnitAccess(userId: string, unitId: string, courseId: 
     create: { userId, unitId, courseId, completed: false },
   });
 }
-

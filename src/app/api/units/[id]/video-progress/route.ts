@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-error";
-import { requireAuth } from "@/lib/api-auth";
+import { requireRole } from "@/lib/api-auth";
 import { VideoProgressSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 import { recomputeUnitCompletion } from "@/lib/services/unit-completion";
@@ -13,7 +13,7 @@ type Ctx = { params: Promise<{ id: string }> };
  * Edge case: resume após fechar o navegador. Dispara conclusão se >=90%.
  */
 export const POST = withErrorHandler(async (req: NextRequest, ctx) => {
-  const session = await requireAuth();
+  const session = await requireRole("STUDENT");
   const { id: unitId } = await (ctx as Ctx).params;
 
   const parsed = VideoProgressSchema.safeParse(await req.json());

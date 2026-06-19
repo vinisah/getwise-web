@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-error";
-import { requireAuth } from "@/lib/api-auth";
+import { requireRole } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 import { ExerciseAttemptSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 import { gradeAnswer } from "@/lib/services/grading";
 import { recomputeUnitCompletion } from "@/lib/services/unit-completion";
+import { awardExercise } from "@/lib/services/gamification";
 import { canAccessUnit } from "@/lib/services/unlock";
 import { acquireLock, releaseLock, submissionKey } from "@/lib/submission-lock";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAuth();
+  // Só ALUNO real submete (admin/professor — inclusive admin em "ver como" — não escreve dado de aluno).
+  const session = await requireRole("STUDENT");
 
   const parsed = ExerciseAttemptSchema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Dados inválidos" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
   }
 
   const { exerciseId, answer, timeSpent } = parsed.data;
@@ -67,7 +66,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       },
     });
 
-    await audit({ userId: session.user.id, action: "ATTEMPT_EXERCISE", entity: "ExerciseAttempt", entityId: attempt.id });
+    await audit({
+      userId: session.user.id,
+      action: "ATTEMPT_EXERCISE",
+      entity: "ExerciseAttempt",
+      entityId: attempt.id,
+    });
 
     // best_score_wins: melhor scorePercent entre todas tentativas
     const best = await prisma.exerciseAttempt.aggregate({
@@ -75,6 +79,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       _max: { scorePercent: true },
     });
     const bestScorePercent = best._max.scorePercent ?? result.scorePercent;
+
+    // Gamificação: XP+skill na 1ª aprovação do exercício; streak/rank sempre recomputam.
+    // Best-effort — falha aqui NÃO derruba a submissão.
+    try {
+      await awardExercise(session.user.id, exerciseId, exercise.type, exercise.points, attempt.id, result.passed);
+    } catch {
+      // ignore — gamificação é secundária ao registro da tentativa
+    }
 
     // Se exercício pertence a uma unidade e foi aprovado, recomputa conclusão
     let unitCompleted = false;

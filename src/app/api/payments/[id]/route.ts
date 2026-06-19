@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 import { MarkPaymentSchema } from "@/lib/schemas";
 import { calcLateCharges } from "@/lib/billing";
+import { categoryIdByName, SYSTEM_CATEGORY } from "@/lib/financial-categories";
 import { prisma } from "@/lib/prisma";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -50,6 +51,8 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
     const days = daysOverdueBrasilia(payment.dueDate, Date.now());
     const charges = calcLateCharges(payment.amount, days);
     const hasCharges = charges.total > payment.amount;
+    // Categoria p/ o DRE (receita bruta). Sem isso, a mensalidade cai em "não classificado".
+    const mensalidadeCatId = await categoryIdByName(SYSTEM_CATEGORY.MENSALIDADE);
 
     const result = await prisma.$transaction(async (tx) => {
       // Transição condicional (anti-race): só efetiva se a baixa ainda NÃO ocorreu.
@@ -73,6 +76,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
             isPaid: true,
             paidAt: new Date(),
             paymentMethod: method ?? null,
+            categoryId: mensalidadeCatId,
             reference,
             createdBy: session.user.id,
           },

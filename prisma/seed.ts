@@ -119,28 +119,113 @@ async function main() {
         price: 79700, // R$ 797,00 em centavos
         lessonsPerMonth: 20,
         lessonDurationMin: 60,
-        features: ["20 aulas/mês", "Material exclusivo", "Tutor IA ilimitado", "Exercícios personalizados", "Suporte prioritário"],
+        features: [
+          "20 aulas/mês",
+          "Material exclusivo",
+          "Tutor IA ilimitado",
+          "Exercícios personalizados",
+          "Suporte prioritário",
+        ],
       },
     }),
   ]);
 
-  // Categorias financeiras
+  // Categorias financeiras + classificação DRE (de-para).
+  // ⚠️ Classificação é DEFAULT sugerido — VALIDAR COM O CONTADOR (custo vs despesa, fixo vs variável).
   const categories = [
-    { name: "Mensalidade", type: "INCOME" as const, color: "#22c55e" },
-    { name: "Matrícula", type: "INCOME" as const, color: "#3b82f6" },
-    { name: "Material didático (venda)", type: "INCOME" as const, color: "#8b5cf6" },
-    { name: "Salários", type: "EXPENSE" as const, color: "#ef4444" },
-    { name: "Aluguel", type: "EXPENSE" as const, color: "#f97316" },
-    { name: "Marketing", type: "EXPENSE" as const, color: "#ec4899" },
-    { name: "Tecnologia", type: "EXPENSE" as const, color: "#6366f1" },
-    { name: "Material didático (compra)", type: "EXPENSE" as const, color: "#84cc16" },
+    {
+      name: "Mensalidade",
+      type: "INCOME" as const,
+      color: "#22c55e",
+      dreGroup: "RECEITA_BRUTA" as const,
+      dreNature: "VARIAVEL" as const,
+    },
+    {
+      name: "Matrícula",
+      type: "INCOME" as const,
+      color: "#3b82f6",
+      dreGroup: "RECEITA_BRUTA" as const,
+      dreNature: "VARIAVEL" as const,
+    },
+    {
+      name: "Material didático (venda)",
+      type: "INCOME" as const,
+      color: "#8b5cf6",
+      dreGroup: "RECEITA_BRUTA" as const,
+      dreNature: "VARIAVEL" as const,
+    },
+    // CSP — custo direto do serviço (professores aplicados + material didático). Fronteira validar c/ contador.
+    {
+      name: "Salários",
+      type: "EXPENSE" as const,
+      color: "#ef4444",
+      dreGroup: "CUSTO_SERVICO" as const,
+      dreNature: "FIXA" as const,
+    },
+    {
+      name: "Material didático (compra)",
+      type: "EXPENSE" as const,
+      color: "#84cc16",
+      dreGroup: "CUSTO_SERVICO" as const,
+      dreNature: "VARIAVEL" as const,
+    },
+    // Despesas operacionais
+    {
+      name: "Aluguel",
+      type: "EXPENSE" as const,
+      color: "#f97316",
+      dreGroup: "DESPESA_ADMINISTRATIVA" as const,
+      dreNature: "FIXA" as const,
+    },
+    {
+      name: "Tecnologia",
+      type: "EXPENSE" as const,
+      color: "#6366f1",
+      dreGroup: "DESPESA_ADMINISTRATIVA" as const,
+      dreNature: "FIXA" as const,
+    },
+    {
+      name: "Marketing",
+      type: "EXPENSE" as const,
+      color: "#ec4899",
+      dreGroup: "DESPESA_COMERCIAL" as const,
+      dreNature: "VARIAVEL" as const,
+    },
+    // Dedução da receita: DAS do Simples (já inclui ISS/PIS/COFINS/IRPJ/CSLL — não lançar tributos à parte).
+    {
+      name: "DAS (Simples Nacional)",
+      type: "EXPENSE" as const,
+      color: "#64748b",
+      dreGroup: "DEDUCAO" as const,
+      dreNature: "VARIAVEL" as const,
+      isDas: true,
+    },
+    // Resultado financeiro
+    {
+      name: "Tarifas e juros bancários",
+      type: "EXPENSE" as const,
+      color: "#0ea5e9",
+      dreGroup: "DESPESA_FINANCEIRA" as const,
+      dreNature: "VARIAVEL" as const,
+    },
+    {
+      name: "Rendimentos financeiros",
+      type: "INCOME" as const,
+      color: "#14b8a6",
+      dreGroup: "RECEITA_FINANCEIRA" as const,
+      dreNature: "VARIAVEL" as const,
+    },
   ];
 
   for (const cat of categories) {
+    const id = `cat-${cat.name.toLowerCase().replace(/\s/g, "-")}`;
+    const { dreGroup, dreNature, ...rest } = cat;
+    const isDas = "isDas" in cat ? ((cat as { isDas?: boolean }).isDas ?? false) : false;
     await prisma.financialCategory.upsert({
-      where: { id: `cat-${cat.name.toLowerCase().replace(/\s/g, "-")}` },
-      update: {},
-      create: { id: `cat-${cat.name.toLowerCase().replace(/\s/g, "-")}`, ...cat },
+      where: { id },
+      // Reclassifica DBs existentes ao re-semear (só os campos DRE; não mexe em nome/cor).
+      update: { dreGroup, dreNature, isDas },
+      create: { id, ...rest, dreGroup, dreNature, isDas },
     });
   }
 
@@ -232,9 +317,25 @@ async function main() {
             order: 1,
             units: {
               create: [
-                { id: "u-a1-1", title: "The Alphabet & Sounds", order: 1, content: "Aprenda o alfabeto em inglês e a pronúncia de cada letra. Pratique soletrar seu nome.\n\nA, B, C, D... cada som importa para a comunicação clara." },
-                { id: "u-a1-2", title: "Greetings & Introductions", order: 2, content: "Hello! Hi! Good morning! Aprenda a se apresentar: 'My name is...', 'Nice to meet you.'" },
-                { id: "u-a1-3", title: "Numbers 1-100", order: 3, content: "Conte de 1 a 100. Pratique idade, telefone e preços." },
+                {
+                  id: "u-a1-1",
+                  title: "The Alphabet & Sounds",
+                  order: 1,
+                  content:
+                    "Aprenda o alfabeto em inglês e a pronúncia de cada letra. Pratique soletrar seu nome.\n\nA, B, C, D... cada som importa para a comunicação clara.",
+                },
+                {
+                  id: "u-a1-2",
+                  title: "Greetings & Introductions",
+                  order: 2,
+                  content: "Hello! Hi! Good morning! Aprenda a se apresentar: 'My name is...', 'Nice to meet you.'",
+                },
+                {
+                  id: "u-a1-3",
+                  title: "Numbers 1-100",
+                  order: 3,
+                  content: "Conte de 1 a 100. Pratique idade, telefone e preços.",
+                },
               ],
             },
           },
@@ -244,8 +345,18 @@ async function main() {
             order: 2,
             units: {
               create: [
-                { id: "u-a1-4", title: "The Verb 'To Be'", order: 1, content: "I am, you are, he/she/it is. A base de toda frase em inglês." },
-                { id: "u-a1-5", title: "Days, Months & Time", order: 2, content: "Monday to Sunday, January to December. What time is it?" },
+                {
+                  id: "u-a1-4",
+                  title: "The Verb 'To Be'",
+                  order: 1,
+                  content: "I am, you are, he/she/it is. A base de toda frase em inglês.",
+                },
+                {
+                  id: "u-a1-5",
+                  title: "Days, Months & Time",
+                  order: 2,
+                  content: "Monday to Sunday, January to December. What time is it?",
+                },
               ],
             },
           },
@@ -271,8 +382,18 @@ async function main() {
             order: 1,
             units: {
               create: [
-                { id: "u-a2-1", title: "Past Simple — Regular Verbs", order: 1, content: "I worked, you played, she watched. Adicione -ed para falar do passado." },
-                { id: "u-a2-2", title: "Past Simple — Irregular Verbs", order: 2, content: "go→went, eat→ate, see→saw. Memorize os verbos irregulares mais comuns." },
+                {
+                  id: "u-a2-1",
+                  title: "Past Simple — Regular Verbs",
+                  order: 1,
+                  content: "I worked, you played, she watched. Adicione -ed para falar do passado.",
+                },
+                {
+                  id: "u-a2-2",
+                  title: "Past Simple — Irregular Verbs",
+                  order: 2,
+                  content: "go→went, eat→ate, see→saw. Memorize os verbos irregulares mais comuns.",
+                },
               ],
             },
           },
@@ -314,7 +435,10 @@ async function main() {
         order: 1,
         isRequired: true,
         points: 10,
-        content: { question: "How do you spell the first letter of the alphabet?", options: ["Ay", "Bee", "Cee", "Dee"] },
+        content: {
+          question: "How do you spell the first letter of the alphabet?",
+          options: ["Ay", "Bee", "Cee", "Dee"],
+        },
         correctAnswer: "Ay",
         explanation: "A é pronunciado 'Ay'.",
       },

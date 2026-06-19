@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-error";
-import { requireAuth } from "@/lib/api-auth";
+import { requireRole } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 import { CompleteUnitSchema } from "@/lib/schemas";
 import { completeUnit } from "@/lib/services/progress";
@@ -10,7 +10,7 @@ import { completeUnit } from "@/lib/services/progress";
  * Lógica de unlock/prereq/certificado delegada à camada de serviço.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAuth();
+  const session = await requireRole("STUDENT");
 
   const parsed = CompleteUnitSchema.safeParse(await req.json());
   if (!parsed.success) {

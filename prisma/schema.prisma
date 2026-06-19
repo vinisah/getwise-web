@@ -100,6 +100,7 @@ model User {
   password      String?
   role          Role      @default(STUDENT)
   isActive      Boolean   @default(true) // false = login bloqueado (desativado pelo admin)
+  uiPrefs       Json?     // preferências de tema/aparência (TweaksPanel); cookie é a fonte ao vivo
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -122,6 +123,7 @@ model User {
   certificates      Certificate[]
   videoProgress     UnitVideoProgress[]
   materialDownloads MaterialDownload[]
+  notifications     Notification[]
 
   // role filtrado em listagens (students/teachers) e KPIs do dashboard; name serve o orderBy junto.
   @@index([role, name])
@@ -404,9 +406,34 @@ model FinancialCategory {
   icon      String?
   createdAt DateTime        @default(now())
 
+  // Classificação contábil para o DRE (cascata). Null = "(não classificado)" — entra no
+  // demonstrativo num grupo à parte, NUNCA some do total. Validar com o contador.
+  dreGroup  DreGroup?
+  dreNature DreNature? // fixa/variável — alimenta margem de contribuição e ponto de equilíbrio
+  isDas     Boolean   @default(false) // marca a conta do DAS (Simples) — evita dupla contagem de tributos
+
   transactions FinancialTransaction[]
 
   @@map("financial_categories")
+}
+
+/** Grupos da cascata do DRE (empresa de serviços, perfil Simples Nacional). */
+enum DreGroup {
+  RECEITA_BRUTA // serviços prestados (mensalidade, matrícula, material vendido)
+  DEDUCAO // DAS (Simples), ISS retido, cancelamentos/devoluções — reduz a receita bruta
+  CUSTO_SERVICO // CSP: custo direto (professores, material didático aplicado, subcontratação)
+  DESPESA_ADMINISTRATIVA // aluguel, contador, software, escritório
+  DESPESA_COMERCIAL // comissão, marketing, publicidade
+  DESPESA_GERAL // demais despesas operacionais
+  RECEITA_FINANCEIRA // juros recebidos, rendimentos
+  DESPESA_FINANCEIRA // juros pagos, tarifas bancárias, multas
+  DEPRECIACAO // depreciação/amortização — somada de volta para o EBITDA
+  IMPOSTO_RENDA // IR/CSLL separado — NO Simples fica 0 (já está dentro do DAS)
+}
+
+enum DreNature {
+  FIXA
+  VARIAVEL
 }
 
 model FinancialTransaction {
@@ -680,6 +707,31 @@ model Certificate {
   @@unique([userId, courseId])
   @@index([courseId])
   @@map("certificates")
+}
+
+enum NotificationType {
+  PAYMENT_DUE
+  PAYMENT_OVERDUE
+  CERTIFICATE_ISSUED
+  LESSON_REMINDER
+  PAYROLL_PROCESSED
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String           @db.Text
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }
 
 model PasswordResetToken {

@@ -30,10 +30,16 @@ beforeEach(() => {
 describe("PATCH /api/lessons/[id]", () => {
   it("admin conclui a aula", async () => {
     mockSession.mockResolvedValueOnce(admin as any);
-    (mockPrisma.lesson.findUnique as any).mockResolvedValueOnce({ id: "L1", teacherId: "t1" });
+    (mockPrisma.lesson.findUnique as any).mockResolvedValueOnce({ id: "L1", teacherId: "t1", status: "SCHEDULED" });
     (mockPrisma.lesson.update as any).mockResolvedValueOnce({ id: "L1", status: "COMPLETED" });
+    (mockPrisma.lessonBooking.findMany as any).mockResolvedValueOnce([]); // conclusão → busca bookings p/ XP
     const res = await lessonPATCH(req({ status: "COMPLETED" }), ctx as any);
     expect(res.status).toBe(200);
+    // cascateia bookings não cancelados p/ COMPLETED
+    expect(mockPrisma.lessonBooking.updateMany).toHaveBeenCalledWith({
+      where: { lessonId: "L1", status: { not: "CANCELLED" } },
+      data: { status: "COMPLETED" },
+    });
   });
 
   it("cancelar cascateia os bookings", async () => {
@@ -43,13 +49,17 @@ describe("PATCH /api/lessons/[id]", () => {
     (mockPrisma.lessonBooking.updateMany as any).mockResolvedValueOnce({ count: 2 });
     const res = await lessonPATCH(req({ status: "CANCELLED" }), ctx as any);
     expect(res.status).toBe(200);
-    expect(mockPrisma.lessonBooking.updateMany).toHaveBeenCalledWith({ where: { lessonId: "L1" }, data: { status: "CANCELLED" } });
+    expect(mockPrisma.lessonBooking.updateMany).toHaveBeenCalledWith({
+      where: { lessonId: "L1" },
+      data: { status: "CANCELLED" },
+    });
   });
 
   it("professor dono pode alterar a própria aula", async () => {
     mockSession.mockResolvedValueOnce(teacher("t1") as any);
-    (mockPrisma.lesson.findUnique as any).mockResolvedValueOnce({ id: "L1", teacherId: "t1" });
+    (mockPrisma.lesson.findUnique as any).mockResolvedValueOnce({ id: "L1", teacherId: "t1", status: "SCHEDULED" });
     (mockPrisma.lesson.update as any).mockResolvedValueOnce({ id: "L1", status: "COMPLETED" });
+    (mockPrisma.lessonBooking.findMany as any).mockResolvedValueOnce([]);
     const res = await lessonPATCH(req({ status: "COMPLETED" }), ctx as any);
     expect(res.status).toBe(200);
   });
@@ -88,7 +98,10 @@ describe("DELETE /api/lessons/[id]", () => {
     (mockPrisma.lesson.delete as any).mockResolvedValueOnce({ id: "L1" });
     const res = await lessonDELETE(delReq(), ctx as any);
     expect(res.status).toBe(200);
-    expect(mockPrisma.exercise.updateMany).toHaveBeenCalledWith({ where: { lessonId: "L1" }, data: { lessonId: null } });
+    expect(mockPrisma.exercise.updateMany).toHaveBeenCalledWith({
+      where: { lessonId: "L1" },
+      data: { lessonId: null },
+    });
   });
 
   it("não-admin → 403", async () => {

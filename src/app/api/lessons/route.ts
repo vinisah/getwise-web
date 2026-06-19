@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import { withErrorHandler, ApiError, zodMessage } from "@/lib/api-error";
 import { requireAuth } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
+import { createNotification } from "@/lib/services/notifications";
 import { CreateLessonSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
@@ -63,7 +64,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: zodMessage(parsed.error) }, { status: 400 });
   }
 
-  const { teacherId, title, description, scheduledAt, duration, meetingUrl, level, maxStudents, studentIds } = parsed.data;
+  const { teacherId, title, description, scheduledAt, duration, meetingUrl, level, maxStudents, studentIds } =
+    parsed.data;
 
   // TEACHER só cria aula em seu próprio nome; ADMIN pode designar outro professor.
   const finalTeacherId = session.user.role === "ADMIN" ? (teacherId ?? session.user.id) : session.user.id;
@@ -96,6 +98,23 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   });
 
   await audit({ userId: session.user.id, action: "CREATE_LESSON", entity: "Lesson", entityId: lesson.id });
+
+  // Avisa os alunos da aula (pós-resposta, best-effort).
+  try {
+    after(async () => {
+      for (const b of lesson.bookings) {
+        await createNotification({
+          userId: b.studentId,
+          type: "LESSON_REMINDER",
+          title: "Nova aula agendada",
+          body: `${lesson.title} em ${lesson.scheduledAt.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}.`,
+          link: "/student/lessons",
+        });
+      }
+    });
+  } catch {
+    /* fora de escopo de request (ex.: testes) — segue sem notificar */
+  }
 
   return NextResponse.json(lesson, { status: 201 });
 });

@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Logo } from "@/components/gw/logo";
 import { Avatar } from "@/components/gw/primitives";
 import { Button } from "@/components/ui/button";
-import { Mail, Lock, Eye, EyeOff, Check, Globe, ArrowRight } from "lucide-react";
+import { Check, Globe, ArrowRight } from "lucide-react";
 
 const VERIFY_MSG: Record<string, { text: string; ok: boolean }> = {
   success: { text: "E-mail confirmado! Faça login.", ok: true },
@@ -21,27 +21,20 @@ function LoginInner() {
   const verify = params.get("verify");
   const verifyMsg = verify ? VERIFY_MSG[verify] : null;
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [show, setShow] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Login passwordless (demo): entra direto como ADMIN, sem credenciais.
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const result = await signIn("credentials", { email, password, redirect: false });
+    const result = await signIn("credentials", { redirect: false });
     setLoading(false);
 
     if (result?.error) {
-      // Mensagem específica (ex.: e-mail não verificado) vem em result.error
-      const msg =
-        result.error && result.error !== "CredentialsSignin"
-          ? result.error
-          : "E-mail ou senha incorretos.";
-      setError(msg);
+      setError("Não foi possível entrar. Tente novamente.");
       return;
     }
     router.push("/");
@@ -57,10 +50,28 @@ function LoginInner() {
         </div>
 
         <div className="gw-login-brand-mid">
-          <span style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.6)" }}>
+          <span
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: ".14em",
+              textTransform: "uppercase",
+              color: "rgba(255,255,255,.6)",
+            }}
+          >
             Sistema de gestão · Idiomas
           </span>
-          <h1 style={{ fontSize: 40, fontWeight: 800, color: "#fff", letterSpacing: "-.03em", lineHeight: 1.08, marginTop: 16 }}>
+          <h1
+            style={{
+              fontSize: 40,
+              fontWeight: 800,
+              color: "#fff",
+              letterSpacing: "-.03em",
+              lineHeight: 1.08,
+              marginTop: 16,
+            }}
+          >
             Ensine, acompanhe
             <br />
             e faça seus alunos
@@ -97,53 +108,35 @@ function LoginInner() {
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 26 }}>
             <Logo variant="icon" height={52} />
           </div>
-          <h2 style={{ fontSize: 23, fontWeight: 800, color: "var(--ink)", letterSpacing: "-.02em", textAlign: "center" }}>Bem-vindo de volta</h2>
-          <p style={{ fontSize: 13.5, color: "var(--muted)", textAlign: "center", marginTop: 5 }}>Acesse o portal Get Wise</p>
+          <h2
+            style={{ fontSize: 23, fontWeight: 800, color: "var(--ink)", letterSpacing: "-.02em", textAlign: "center" }}
+          >
+            Bem-vindo de volta
+          </h2>
+          <p style={{ fontSize: 13.5, color: "var(--muted)", textAlign: "center", marginTop: 5 }}>
+            Acesse o portal Get Wise
+          </p>
 
           <form onSubmit={handleSubmit} style={{ marginTop: 26, display: "flex", flexDirection: "column", gap: 14 }}>
-            <label className="gw-field">
-              <span className="gw-field-label">E-mail</span>
-              <div className="gw-field-box">
-                <Mail size={18} color="var(--muted)" />
-                <input type="email" placeholder="voce@getwise.com.br" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
-              </div>
-            </label>
-
-            <label className="gw-field">
-              <span className="gw-field-label">Senha</span>
-              <div className="gw-field-box">
-                <Lock size={18} color="var(--muted)" />
-                <input
-                  type={show ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                />
-                <button type="button" className="gw-eye" onClick={() => setShow(!show)}>
-                  {show ? <EyeOff size={17} /> : <Eye size={17} />}
-                </button>
-              </div>
-            </label>
-
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--ink-2)", cursor: "pointer" }}>
-                <input type="checkbox" defaultChecked style={{ accentColor: "var(--accent)", width: 15, height: 15 }} /> Manter conectado
-              </label>
-              <Link href="/forgot-password" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
-                Esqueceu a senha?
-              </Link>
-            </div>
+            <p style={{ fontSize: 12.5, color: "var(--muted)", textAlign: "center", lineHeight: 1.5 }}>
+              Acesso de demonstração — você entra como administrador, sem senha.
+            </p>
 
             {verifyMsg && (
-              <p style={{ fontSize: 13, color: verifyMsg.ok ? "var(--success)" : "var(--danger)", textAlign: "center" }}>
+              <p
+                style={{ fontSize: 13, color: verifyMsg.ok ? "var(--success)" : "var(--danger)", textAlign: "center" }}
+              >
                 {verifyMsg.text}
               </p>
             )}
             {error && <p style={{ fontSize: 13, color: "var(--danger)", textAlign: "center" }}>{error}</p>}
 
-            <Button type="submit" variant="accent" disabled={loading} style={{ marginTop: 4, width: "100%", padding: 13 }}>
+            <Button
+              type="submit"
+              variant="accent"
+              disabled={loading}
+              style={{ marginTop: 4, width: "100%", padding: 13 }}
+            >
               {loading ? "Entrando..." : "Entrar no portal"}
               {!loading && <ArrowRight size={17} />}
             </Button>

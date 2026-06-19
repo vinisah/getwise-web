@@ -6,6 +6,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getBoletoProvider } from "@/lib/billing/provider";
+import { categoryIdByName, SYSTEM_CATEGORY } from "@/lib/financial-categories";
+import { createNotification } from "@/lib/services/notifications";
 
 export interface GenerateResult {
   paymentId: string;
@@ -50,6 +52,17 @@ export async function generateChargeForPayment(paymentId: string): Promise<Gener
     data: { chargeId: charge.chargeId, boletoUrl: charge.boletoUrl, boletoLine: charge.boletoLine, method: "BOLETO" },
   });
   if (res.count === 0) return { paymentId, status: "skipped", reason: "cobrança gerada em paralelo" };
+
+  // Notifica o aluno (1x — só na 1ª geração da cobrança; best-effort).
+  const overdue = payment.dueDate.getTime() < Date.now();
+  await createNotification({
+    userId: payment.studentId,
+    type: overdue ? "PAYMENT_OVERDUE" : "PAYMENT_DUE",
+    title: overdue ? "Mensalidade vencida" : "Mensalidade a vencer",
+    body: overdue
+      ? `Sua mensalidade ${payment.month}/${payment.year} está vencida.`
+      : `Sua mensalidade ${payment.month}/${payment.year} vence em ${payment.dueDate.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}.`,
+  });
 
   return { paymentId, status: "created", chargeId: charge.chargeId };
 }
@@ -110,6 +123,8 @@ export async function settleChargePaid(
 
   const reference = `payment:${payment.id}`;
   const ref = `${String(payment.month).padStart(2, "0")}/${payment.year}`;
+  // Categoria p/ o DRE (receita bruta). Sem isso, a receita do boleto cai em "não classificado".
+  const mensalidadeCatId = await categoryIdByName(SYSTEM_CATEGORY.MENSALIDADE);
 
   return prisma.$transaction(async (tx) => {
     const res = await tx.payment.updateMany({
@@ -128,6 +143,7 @@ export async function settleChargePaid(
           isPaid: true,
           paidAt: new Date(),
           paymentMethod: "BOLETO",
+          categoryId: mensalidadeCatId,
           reference,
           createdBy: null,
         },

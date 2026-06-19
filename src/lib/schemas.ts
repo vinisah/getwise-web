@@ -8,21 +8,28 @@ const CEFRLevel = z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]);
 const BrazilianPhone = z.string().max(20).optional();
 const CPF = z.string().max(14).optional();
 // Recebe reais (unidade humana), devolve centavos (Int) para armazenamento.
-const BrlAmount = z.coerce
-  .number()
-  .positive()
-  .max(1_000_000, "Valor máximo: R$ 1.000.000")
-  .transform(reaisToCents);
+const BrlAmount = z.coerce.number().positive().max(1_000_000, "Valor máximo: R$ 1.000.000").transform(reaisToCents);
 
 // Datas vêm como string (input/JSON). Validar parse evita `new Date("lixo")` → Invalid Date → 500.
-const DateString = z.string().min(1, "Data obrigatória").refine((v) => !Number.isNaN(Date.parse(v)), "Data inválida");
-const OptionalDateString = z.string().refine((v) => v === "" || !Number.isNaN(Date.parse(v)), "Data inválida").optional();
+const DateString = z
+  .string()
+  .min(1, "Data obrigatória")
+  .refine((v) => !Number.isNaN(Date.parse(v)), "Data inválida");
+const OptionalDateString = z
+  .string()
+  .refine((v) => v === "" || !Number.isNaN(Date.parse(v)), "Data inválida")
+  .optional();
 
 // URL opcional para links coláveis: aceita vazio, prefixa https:// quando o usuário omite o
 // scheme (ex.: "youtube.com/..."), e exige http(s) (bloqueia javascript:/ftp:/etc.).
 const OptionalUrl = z.preprocess(
   (v) => (typeof v === "string" && v.trim() && !/^[a-z][a-z0-9+.-]*:\/\//i.test(v.trim()) ? `https://${v.trim()}` : v),
-  z.string().url().refine((u) => /^https?:\/\//i.test(u), "URL deve começar com http(s)").optional().or(z.literal(""))
+  z
+    .string()
+    .url()
+    .refine((u) => /^https?:\/\//i.test(u), "URL deve começar com http(s)")
+    .optional()
+    .or(z.literal(""))
 );
 
 // ─── Alunos ──────────────────────────────────────────────────────────────────
@@ -73,7 +80,7 @@ export const CreateLessonSchema = z.object({
   description: z.string().max(1000).optional(),
   scheduledAt: DateString,
   duration: z.coerce.number().int().min(15).max(180).default(50),
-  meetingUrl: z.string().url("URL inválida").optional().or(z.literal("")),
+  meetingUrl: OptionalUrl,
   level: CEFRLevel.default("A1"),
   maxStudents: z.coerce.number().int().min(1).max(30).default(1),
   studentIds: z.array(z.string().min(1)).optional(),
@@ -87,7 +94,7 @@ export const UpdateLessonSchema = z
     description: z.string().max(1000).optional(),
     scheduledAt: OptionalDateString,
     duration: z.coerce.number().int().min(15).max(180).optional(),
-    meetingUrl: z.string().url("URL inválida").optional().or(z.literal("")),
+    meetingUrl: OptionalUrl,
     level: CEFRLevel.optional(),
     status: z.enum(["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
     notes: z.string().max(1000).optional(),
@@ -118,11 +125,15 @@ export const CreateTransactionSchema = z.object({
   date: DateString,
   dueDate: OptionalDateString,
   categoryId: z.string().optional(),
-  isPaid: z.boolean().or(z.enum(["true", "false"]).transform((v) => v === "true")).default(false),
-  isRecurring: z.boolean().or(z.enum(["true", "false"]).transform((v) => v === "true")).default(false),
-  paymentMethod: z
-    .enum(["PIX", "CREDIT_CARD", "DEBIT_CARD", "BOLETO"])
-    .optional(),
+  isPaid: z
+    .boolean()
+    .or(z.enum(["true", "false"]).transform((v) => v === "true"))
+    .default(false),
+  isRecurring: z
+    .boolean()
+    .or(z.enum(["true", "false"]).transform((v) => v === "true"))
+    .default(false),
+  paymentMethod: z.enum(["PIX", "CREDIT_CARD", "DEBIT_CARD", "BOLETO"]).optional(),
   // Bloqueia colisão com namespaces internos reservados (payment:/salary:/recurring:/enrollment:).
   reference: z
     .string()
@@ -137,8 +148,14 @@ export const CreateTransactionSchema = z.object({
 // isPaid é redefinido SEM .default(false): com partial(), o default dispararia em
 // undefined e marcaria a transação como não-paga a cada edição que omitisse o campo.
 export const UpdateTransactionSchema = CreateTransactionSchema.partial().extend({
-  isPaid: z.boolean().or(z.enum(["true", "false"]).transform((v) => v === "true")).optional(),
-  isRecurring: z.boolean().or(z.enum(["true", "false"]).transform((v) => v === "true")).optional(),
+  isPaid: z
+    .boolean()
+    .or(z.enum(["true", "false"]).transform((v) => v === "true"))
+    .optional(),
+  isRecurring: z
+    .boolean()
+    .or(z.enum(["true", "false"]).transform((v) => v === "true"))
+    .optional(),
   // Edição reenvia o reference já-existente (inclusive os internos payment:/salary:/recurring:).
   // O guard de prefixo reservado vale só na CRIAÇÃO (input humano) — sem ele aqui, senão
   // recategorizar uma despesa recorrente/mensalidade/folha quebraria com 400.
@@ -162,7 +179,10 @@ export const CreateSalaryPaymentSchema = z.object({
   type: z.enum(["SALARY", "THIRTEENTH_1", "THIRTEENTH_2", "VACATION", "OTHER"]).default("SALARY"),
   // Bruto em reais → centavos. Default: salário cadastrado do funcionário.
   grossAmount: BrlAmount.optional(),
-  isPaid: z.boolean().or(z.enum(["true", "false"]).transform((v) => v === "true")).default(true),
+  isPaid: z
+    .boolean()
+    .or(z.enum(["true", "false"]).transform((v) => v === "true"))
+    .default(true),
   notes: z.string().max(1000).optional(),
 });
 
@@ -216,7 +236,14 @@ const ExerciseTypeEnum = z.enum([
 ]);
 
 // Tipos corrigidos automaticamente → exigem correctAnswer (senão exercício insolúvel).
-const AUTO_GRADED = new Set(["MULTIPLE_CHOICE", "FILL_IN_BLANK", "TRUE_FALSE", "WORD_MATCH", "TRANSLATION", "SENTENCE_ORDER"]);
+const AUTO_GRADED = new Set([
+  "MULTIPLE_CHOICE",
+  "FILL_IN_BLANK",
+  "TRUE_FALSE",
+  "WORD_MATCH",
+  "TRANSLATION",
+  "SENTENCE_ORDER",
+]);
 
 export const CreateExerciseSchema = z
   .object({
@@ -235,7 +262,10 @@ export const CreateExerciseSchema = z
     order: z.coerce.number().int().min(0).max(999).default(0),
   })
   .superRefine((d, ctx) => {
-    if (AUTO_GRADED.has(d.type) && (d.correctAnswer === undefined || d.correctAnswer === null || d.correctAnswer === "")) {
+    if (
+      AUTO_GRADED.has(d.type) &&
+      (d.correctAnswer === undefined || d.correctAnswer === null || d.correctAnswer === "")
+    ) {
       ctx.addIssue({ code: "custom", path: ["correctAnswer"], message: `correctAnswer é obrigatório para ${d.type}` });
     }
   });
@@ -310,9 +340,11 @@ export const CreateModuleSchema = z.object({
   order: z.coerce.number().int().min(0).max(999).default(0),
 });
 
-export const UpdateModuleSchema = CreateModuleSchema.partial().omit({ courseId: true }).extend({
-  order: z.coerce.number().int().min(0).max(999).optional(), // sem default herdado (anti-clobber)
-});
+export const UpdateModuleSchema = CreateModuleSchema.partial()
+  .omit({ courseId: true })
+  .extend({
+    order: z.coerce.number().int().min(0).max(999).optional(), // sem default herdado (anti-clobber)
+  });
 
 export const CreateUnitSchema = z.object({
   moduleId: z.string().min(1, "ID inválido"),
@@ -326,12 +358,14 @@ export const CreateUnitSchema = z.object({
   order: z.coerce.number().int().min(0).max(999).default(0),
 });
 
-export const UpdateUnitSchema = CreateUnitSchema.partial().omit({ moduleId: true }).extend({
-  // sem defaults herdados (content/type/order) — evitaria clobber em edição parcial.
-  content: z.string().max(50_000).optional(),
-  type: z.enum(["READING", "VIDEO", "MIXED"]).optional(),
-  order: z.coerce.number().int().min(0).max(999).optional(),
-});
+export const UpdateUnitSchema = CreateUnitSchema.partial()
+  .omit({ moduleId: true })
+  .extend({
+    // sem defaults herdados (content/type/order) — evitaria clobber em edição parcial.
+    content: z.string().max(50_000).optional(),
+    type: z.enum(["READING", "VIDEO", "MIXED"]).optional(),
+    order: z.coerce.number().int().min(0).max(999).optional(),
+  });
 
 export const CreateMaterialSchema = z.object({
   unitId: z.string().min(1, "ID inválido"),

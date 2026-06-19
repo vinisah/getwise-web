@@ -7,6 +7,10 @@ export function cn(...inputs: ClassValue[]) {
 
 export const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
 
+/** URL só se http(s); senão undefined. Bloqueia javascript:/data: em href (defesa no render). */
+export const safeHttpUrl = (url: string | null | undefined): string | undefined =>
+  url && /^https?:\/\//i.test(url) ? url : undefined;
+
 export const fmtBRL = (n: number | string) =>
   "R$ " + Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

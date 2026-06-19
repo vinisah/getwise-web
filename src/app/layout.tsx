@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { Hanken_Grotesk, Spline_Sans_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { PREFS_COOKIE, THEMES, parsePrefsCookie, themeVars } from "@/lib/theme";
 
 const hanken = Hanken_Grotesk({
   variable: "--font-hanken",
@@ -20,17 +22,23 @@ export const metadata: Metadata = {
   description: "Sistema de gestão de aulas de inglês Get Wise",
 };
 
-export const viewport: Viewport = {
-  themeColor: "#16204E",
-};
+// theme-color (chrome do navegador/PWA) acompanha o tema escolhido (mesmo cookie do <html>).
+export async function generateViewport(): Promise<Viewport> {
+  const prefs = parsePrefsCookie((await cookies()).get(PREFS_COOKIE)?.value);
+  return { themeColor: THEMES[prefs.theme].brand };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Tema vem do cookie no servidor → aplicado inline no <html> (sem flash de tema).
+  const prefs = parsePrefsCookie((await cookies()).get(PREFS_COOKIE)?.value);
+  const style = themeVars(prefs) as React.CSSProperties;
+
   return (
-    <html lang="pt-BR" className={`${hanken.variable} ${spline.variable}`}>
+    <html lang="pt-BR" className={`${hanken.variable} ${spline.variable}`} style={style}>
       <body>
         <Providers>{children}</Providers>
       </body>

@@ -1,15 +1,23 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import bcrypt from "bcryptjs";
+import { cookies } from "next/headers";
 import { prisma } from "./prisma";
-import { checkRateLimit, resetRateLimit, LIMITS } from "./rate-limit";
 import { audit } from "./audit";
+import { PREVIEW_COOKIE } from "./effective-user";
 import type { Role } from "@prisma/client";
 
-// Hash bcrypt válido de string aleatória — usado para igualar o tempo de resposta
-// quando o e-mail não existe (anti-enumeração por timing).
-const DUMMY_HASH = "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+/**
+ * Login passwordless (modo demonstração): autentica sempre como o primeiro ADMIN ativo.
+ * Decisão consciente do dono — sistema em desenvolvimento, sem dados sensíveis.
+ * ⚠️ Reavaliar antes de cadastrar dados reais: qualquer visitante vira ADMIN.
+ */
+export async function resolveDemoAdmin() {
+  return prisma.user.findFirst({
+    where: { role: "ADMIN", isActive: true },
+    orderBy: { createdAt: "asc" },
+  });
+}
 
 export const authOptions: NextAuthOptions = {
   // Cast: o adapter não conhece o tipo do client com `omit` global (e nem é
@@ -28,82 +36,26 @@ export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Senha", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
-
-        const email = credentials.email.toLowerCase().trim();
-
-        // Rate limit por email (5 tentativas / 15 min)
-        const { allowed, retryAfter } = await checkRateLimit(
-          `login:${email}`,
-          LIMITS.LOGIN.max,
-          LIMITS.LOGIN.windowMs
-        );
-
-        if (!allowed) {
-          // Fail loud: mensagem clara com tempo restante
-          throw new Error(
-            `Muitas tentativas. Tente novamente em ${retryAfter} segundo(s).`
-          );
-        }
-
-        // Opt-in explícito do hash: o client global omite password em tudo.
-        const user = await prisma.user.findUnique({
-          where: { email },
-          omit: { password: false },
-        });
-
-        if (!user || !user.password) {
-          // Roda bcrypt mesmo sem usuário → tempo de resposta constante
-          // (não revela por timing se o e-mail existe).
-          await bcrypt.compare(credentials.password, DUMMY_HASH);
-          return null;
-        }
-
-        const isValid = await bcrypt.compare(credentials.password, user.password);
-
-        if (!isValid) {
-          await audit({
-            userId: user.id,
-            action: "LOGIN",
-            entity: "User",
-            entityId: user.id,
-            payload: { success: false, email },
-          });
-          return null;
-        }
-
-        // Conta desativada pelo admin → login bloqueado
-        if (!user.isActive) {
-          throw new Error("Conta desativada. Fale com a administração.");
-        }
-
-        // Regra de negócio: e-mail deve estar confirmado para logar
-        if (!user.emailVerified) {
-          throw new Error("Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.");
-        }
-
-        // Login bem-sucedido: reset do contador
-        await resetRateLimit(`login:${email}`);
+      // Login passwordless (demo): sem campos de credencial — entra sempre como ADMIN.
+      credentials: {},
+      async authorize() {
+        const admin = await resolveDemoAdmin();
+        if (!admin) return null;
 
         await audit({
-          userId: user.id,
+          userId: admin.id,
           action: "LOGIN",
           entity: "User",
-          entityId: user.id,
-          payload: { success: true },
+          entityId: admin.id,
+          payload: { success: true, passwordless: true },
         });
 
         return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          image: user.image,
+          id: admin.id,
+          name: admin.name,
+          email: admin.email,
+          role: admin.role,
+          image: admin.image,
         };
       },
     }),
@@ -142,6 +94,17 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = token.id as string;
       }
       return session;
+    },
+  },
+  events: {
+    // Logout limpa a "visão" do seletor de papel — senão o cookie gw_preview (TTL 2h)
+    // sobrevive ao relogin e mostra chrome de aluno/professor sobre o painel admin.
+    async signOut() {
+      try {
+        (await cookies()).delete(PREVIEW_COOKIE);
+      } catch {
+        // contexto sem cookies graváveis — ignora (cookie expira sozinho em 2h)
+      }
     },
   },
 };

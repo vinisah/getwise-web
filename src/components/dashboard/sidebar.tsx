@@ -62,6 +62,7 @@ const NAV: Record<string, NavEntry[]> = {
   TEACHER: [
     { section: "Ensinar" },
     { id: "dashboard", label: "Dashboard", href: "/teacher", icon: LayoutGrid },
+    { id: "lessons", label: "Minhas Aulas", href: "/teacher/lessons", icon: Calendar },
     { id: "courses", label: "Catálogo", href: "/student/courses", icon: BookOpen },
   ],
 };
@@ -77,12 +78,14 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export function Sidebar() {
+export function Sidebar({ previewRole, previewName }: { previewRole?: string; previewName?: string } = {}) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const { open, setOpen } = useMobileNav();
   const user = session?.user as { name?: string; email?: string; role?: string } | undefined;
-  const role = user?.role || "STUDENT";
+  // Em "ver como" (admin), o role/nome efetivos vêm do servidor e dirigem a navegação.
+  const role = previewRole || user?.role || "STUDENT";
+  const displayName = previewName ?? user?.name;
   const nav = NAV[role] || NAV.STUDENT;
 
   // Fecha o drawer ao trocar de rota (navegação no mobile).
@@ -120,44 +123,66 @@ export function Sidebar() {
                 {item.section}
               </div>
             ) : (
-              <Link key={item.id} href={item.href} onClick={() => setOpen(false)} className={cx("gw-nav", isActive(pathname, item.href) && "active")}>
-              <item.icon size={19} strokeWidth={isActive(pathname, item.href) ? 2 : 1.7} />
-              <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
-              {item.badge && (
-                <span
-                  style={{
-                    fontSize: 9.5,
-                    fontWeight: 800,
-                    letterSpacing: ".08em",
-                    fontFamily: "var(--mono)",
-                    padding: "2px 6px",
-                    borderRadius: 5,
-                    background: "rgba(255,255,255,.16)",
-                    color: "#fff",
-                  }}
-                >
-                  {item.badge}
-                </span>
-              )}
-              {isActive(pathname, item.href) && <span className="gw-nav-dot" />}
-            </Link>
-          )
-        )}
-      </nav>
+              <Link
+                key={item.id}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className={cx("gw-nav", isActive(pathname, item.href) && "active")}
+              >
+                <item.icon size={19} strokeWidth={isActive(pathname, item.href) ? 2 : 1.7} />
+                <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
+                {item.badge && (
+                  <span
+                    style={{
+                      fontSize: 9.5,
+                      fontWeight: 800,
+                      letterSpacing: ".08em",
+                      fontFamily: "var(--mono)",
+                      padding: "2px 6px",
+                      borderRadius: 5,
+                      background: "rgba(255,255,255,.16)",
+                      color: "#fff",
+                    }}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+                {isActive(pathname, item.href) && <span className="gw-nav-dot" />}
+              </Link>
+            )
+          )}
+        </nav>
 
-      <div className="gw-side-foot">
-        <div className="gw-side-user">
-          <Avatar initials={getInitials(user?.name || "GW")} size={36} tone="seed" />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {user?.name}
-            </div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,.55)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {ROLE_LABEL[role]}
+        <div className="gw-side-foot">
+          <div className="gw-side-user">
+            <Avatar initials={getInitials(displayName || "GW")} size={36} tone="seed" />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#fff",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {displayName}
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "rgba(255,255,255,.55)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {ROLE_LABEL[role]}
+              </div>
             </div>
           </div>
         </div>
-      </div>
       </aside>
     </>
   );
