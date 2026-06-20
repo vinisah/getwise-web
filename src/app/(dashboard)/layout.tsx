@@ -1,13 +1,11 @@
-import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
 import { MobileNavProvider } from "@/components/dashboard/mobile-nav";
-import { getEffectiveUser } from "@/lib/effective-user";
+import { getCachedSession, getEffectiveUser } from "@/lib/effective-user";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
 
   // Sessão sem user = conta desativada/inválida (ver callback session em lib/auth.ts).
   if (!session?.user) {

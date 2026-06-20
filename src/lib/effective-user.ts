@@ -1,18 +1,21 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { ApiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import type { UserRole } from "@/types";
 
 /**
- * "Ver como" (admin-only, read-only): permite que um ADMIN visualize o painel de aluno/professor
- * com os dados de um usuário-alvo, SEM trocar de conta e SEM elevar privilégio.
+ * "Ver como" (seletor de papel, admin-only): permite que um ADMIN opere o painel de
+ * aluno/professor com os dados de um usuário-alvo, SEM trocar de conta e SEM elevar privilégio.
  *
- * Regras de segurança:
+ * Regras:
  * - Só ADMIN pode ativar (o cookie `gw_preview` só é setado por POST /api/admin/preview, requireAdmin).
  * - O effective user NUNCA é mais privilegiado que a sessão real (admin só "rebaixa" a visão p/ STUDENT/TEACHER).
- * - É só LEITURA: as rotas de mutação de aluno exigem o role REAL (requireRole STUDENT/TEACHER),
- *   então um admin em preview não consegue escrever dado do alvo.
+ * - LEITURA e ESCRITA seguem a IDENTIDADE EFETIVA: as rotas de aluno (attempt/progress/video) operam
+ *   sobre `eff.id`. No modo demo (login passwordless = único usuário é ADMIN) isso é necessário para
+ *   o fluxo do aluno funcionar; em prod com logins reais, um aluno real é seu próprio effective user.
  */
 export const PREVIEW_COOKIE = "gw_preview";
 
@@ -26,8 +29,11 @@ export interface EffectiveUser {
   realAdminId?: string;
 }
 
-export async function getEffectiveUser(): Promise<EffectiveUser | null> {
-  const session = await getServerSession(authOptions);
+/** Sessão deduplicada por request (React cache) — evita re-checar o JWT no DB várias vezes por página. */
+export const getCachedSession = cache(async () => getServerSession(authOptions));
+
+export const getEffectiveUser = cache(async (): Promise<EffectiveUser | null> => {
+  const session = await getCachedSession();
   const self = session?.user as { id?: string; name?: string; role?: UserRole } | undefined;
   if (!self?.id) return null;
 
@@ -47,4 +53,16 @@ export async function getEffectiveUser(): Promise<EffectiveUser | null> {
   if (!target || !target.isActive || target.role === "ADMIN") return base;
 
   return { id: target.id, name: target.name, role: target.role as UserRole, isPreview: true, realAdminId: self.id };
+});
+
+/**
+ * Exige que o usuário EFETIVO seja STUDENT (aluno real OU admin "vendo como" aluno). Usado nas rotas
+ * de escrita do aluno: com login passwordless (só ADMIN), exigir o role REAL deixaria o fluxo do aluno
+ * inalcançável (403). A escrita usa o `eff.id` retornado.
+ */
+export async function requireEffectiveStudent(): Promise<EffectiveUser> {
+  const eff = await getEffectiveUser();
+  if (!eff) throw new ApiError(401, "Não autenticado");
+  if (eff.role !== "STUDENT") throw new ApiError(403, "Acesso restrito a alunos");
+  return eff;
 }

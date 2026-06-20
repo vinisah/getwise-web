@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-error";
-import { requireRole } from "@/lib/api-auth";
+import { requireEffectiveStudent } from "@/lib/effective-user";
 import { audit } from "@/lib/audit";
 import { ExerciseAttemptSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
@@ -11,8 +11,8 @@ import { canAccessUnit } from "@/lib/services/unlock";
 import { acquireLock, releaseLock, submissionKey } from "@/lib/submission-lock";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  // Só ALUNO real submete (admin/professor — inclusive admin em "ver como" — não escreve dado de aluno).
-  const session = await requireRole("STUDENT");
+  // Aluno EFETIVO (aluno real OU admin "vendo como" aluno) submete sobre o próprio eff.id.
+  const eff = await requireEffectiveStudent();
 
   const parsed = ExerciseAttemptSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -22,7 +22,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const { exerciseId, answer, timeSpent } = parsed.data;
 
   // Edge case: impedir submissões simultâneas do mesmo exercício
-  const lockKey = submissionKey(session.user.id, exerciseId);
+  const lockKey = submissionKey(eff.id, exerciseId);
   if (!(await acquireLock(lockKey))) {
     return NextResponse.json({ error: "Submissão em processamento. Aguarde." }, { status: 409 });
   }
@@ -31,10 +31,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     const exercise = await prisma.exercise.findUnique({ where: { id: exerciseId } });
     if (!exercise) return NextResponse.json({ error: "Exercício não encontrado" }, { status: 404 });
 
-    // Gate de conteúdo: aluno só submete em exercício de unidade desbloqueada.
-    // Sem isso, qualquer aluno enumera ids (GET /api/exercises) e colhe gabarito de unidades bloqueadas.
-    if (session.user.role === "STUDENT" && exercise.unitId) {
-      const ok = await canAccessUnit(session.user.id, exercise.unitId);
+    // Gate de conteúdo: só submete em exercício de unidade desbloqueada.
+    // Sem isso, qualquer um enumera ids (GET /api/exercises) e colhe gabarito de unidades bloqueadas.
+    if (exercise.unitId) {
+      const ok = await canAccessUnit(eff.id, exercise.unitId);
       if (!ok) return NextResponse.json({ error: "Unidade bloqueada" }, { status: 403 });
     }
 
@@ -56,7 +56,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     const attempt = await prisma.exerciseAttempt.create({
       data: {
         exerciseId,
-        studentId: session.user.id,
+        studentId: eff.id,
         answer: answer as import("@prisma/client").Prisma.InputJsonValue,
         isCorrect: result.isCorrect,
         score,
@@ -67,7 +67,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     });
 
     await audit({
-      userId: session.user.id,
+      userId: eff.id,
       action: "ATTEMPT_EXERCISE",
       entity: "ExerciseAttempt",
       entityId: attempt.id,
@@ -75,7 +75,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
     // best_score_wins: melhor scorePercent entre todas tentativas
     const best = await prisma.exerciseAttempt.aggregate({
-      where: { studentId: session.user.id, exerciseId },
+      where: { studentId: eff.id, exerciseId },
       _max: { scorePercent: true },
     });
     const bestScorePercent = best._max.scorePercent ?? result.scorePercent;
@@ -83,7 +83,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     // Gamificação: XP+skill na 1ª aprovação do exercício; streak/rank sempre recomputam.
     // Best-effort — falha aqui NÃO derruba a submissão.
     try {
-      await awardExercise(session.user.id, exerciseId, exercise.type, exercise.points, attempt.id, result.passed);
+      await awardExercise(eff.id, exerciseId, exercise.type, exercise.points, attempt.id, result.passed);
     } catch {
       // ignore — gamificação é secundária ao registro da tentativa
     }
@@ -91,14 +91,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     // Se exercício pertence a uma unidade e foi aprovado, recomputa conclusão
     let unitCompleted = false;
     if (exercise.unitId && result.passed) {
-      const rc = await recomputeUnitCompletion(session.user.id, session.user.name, exercise.unitId);
+      const rc = await recomputeUnitCompletion(eff.id, eff.name, exercise.unitId);
       unitCompleted = rc.completed;
     }
 
-    // Revela gabarito quando: staff; OU aluno acertou (passed); OU exercício de prática pura
-    // (sem unitId — não conta em progressão, feedback didático ok). Exercício de UNIDADE só
-    // revela ao aprovar, senão aluno burlaria a conclusão da unidade colhendo a resposta.
-    const reveal = session.user.role !== "STUDENT" || result.passed || !exercise.unitId;
+    // Revela gabarito ao aprovar (passed) OU exercício de prática pura (sem unitId). Exercício de
+    // UNIDADE só revela ao aprovar, senão burla a conclusão colhendo a resposta.
+    const reveal = result.passed || !exercise.unitId;
 
     return NextResponse.json({
       isCorrect: result.isCorrect,

@@ -7,55 +7,7 @@ import { Card, Badge } from "@/components/gw/primitives";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/utils";
 import { Download } from "lucide-react";
-
-/** Grupos de filtro → prefixos de ação no audit log. */
-const FILTERS: Record<string, { label: string; actions?: string[] }> = {
-  ALL: { label: "Tudo" },
-  FINANCE: {
-    label: "Financeiro",
-    actions: [
-      "CREATE_TRANSACTION",
-      "UPDATE_TRANSACTION",
-      "DELETE_TRANSACTION",
-      "CREATE_SALARY_PAYMENT",
-      "PAYMENT_CREATED",
-      "PAYMENT_UPDATED",
-      "GENERATE_RECURRING",
-      "ADJUST_PLANS",
-    ],
-  },
-  PEOPLE: {
-    label: "Pessoas",
-    actions: [
-      "CREATE_STUDENT",
-      "UPDATE_STUDENT",
-      "DELETE_STUDENT",
-      "CREATE_EMPLOYEE",
-      "UPDATE_EMPLOYEE",
-      "DELETE_EMPLOYEE",
-      "CREATE_ENROLLMENT",
-      "UPDATE_USER",
-      "REGISTER",
-    ],
-  },
-  AUTH: { label: "Acesso", actions: ["LOGIN", "LOGOUT", "VERIFY_EMAIL", "PASSWORD_RESET"] },
-  CONTENT: {
-    label: "Conteúdo",
-    actions: [
-      "CREATE_COURSE",
-      "UPDATE_COURSE",
-      "DELETE_COURSE",
-      "CREATE_MODULE",
-      "UPDATE_MODULE",
-      "DELETE_MODULE",
-      "CREATE_UNIT",
-      "UPDATE_UNIT",
-      "DELETE_UNIT",
-      "CREATE_EXERCISE",
-      "ISSUE_CERTIFICATE",
-    ],
-  },
-};
+import { AUDIT_FILTERS as FILTERS } from "@/lib/audit-filters";
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const session = await getServerSession(authOptions);

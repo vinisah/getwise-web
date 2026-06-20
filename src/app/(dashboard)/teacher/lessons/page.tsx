@@ -91,7 +91,6 @@ export default async function TeacherLessonsPage() {
                       studentId: b.studentId,
                       name: b.student.name,
                       attendance: b.attendance,
-                      rating: b.rating,
                     }))}
                   />
                 </div>

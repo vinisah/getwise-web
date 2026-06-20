@@ -1,47 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-error";
 import { requireAdmin } from "@/lib/api-auth";
+import { AUDIT_FILTERS } from "@/lib/audit-filters";
 import { prisma } from "@/lib/prisma";
-
-/** Grupos de filtro → prefixos de ação (espelha a tela /admin/audit). */
-const FILTER_ACTIONS: Record<string, string[] | undefined> = {
-  ALL: undefined,
-  FINANCE: [
-    "CREATE_TRANSACTION",
-    "UPDATE_TRANSACTION",
-    "DELETE_TRANSACTION",
-    "CREATE_SALARY_PAYMENT",
-    "PAYMENT_CREATED",
-    "PAYMENT_UPDATED",
-    "GENERATE_RECURRING",
-    "ADJUST_PLANS",
-  ],
-  PEOPLE: [
-    "CREATE_STUDENT",
-    "UPDATE_STUDENT",
-    "DELETE_STUDENT",
-    "CREATE_EMPLOYEE",
-    "UPDATE_EMPLOYEE",
-    "DELETE_EMPLOYEE",
-    "CREATE_ENROLLMENT",
-    "UPDATE_USER",
-    "REGISTER",
-  ],
-  AUTH: ["LOGIN", "LOGOUT", "VERIFY_EMAIL", "PASSWORD_RESET"],
-  CONTENT: [
-    "CREATE_COURSE",
-    "UPDATE_COURSE",
-    "DELETE_COURSE",
-    "CREATE_MODULE",
-    "UPDATE_MODULE",
-    "DELETE_MODULE",
-    "CREATE_UNIT",
-    "UPDATE_UNIT",
-    "DELETE_UNIT",
-    "CREATE_EXERCISE",
-    "ISSUE_CERTIFICATE",
-  ],
-};
 
 /**
  * Escapa campo CSV (separador ;) e neutraliza CSV formula injection.
@@ -62,7 +23,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
   const { searchParams } = new URL(req.url);
   const fk = searchParams.get("filter");
-  const actions = fk && fk in FILTER_ACTIONS ? FILTER_ACTIONS[fk] : undefined;
+  const actions = fk && fk in AUDIT_FILTERS ? AUDIT_FILTERS[fk].actions : undefined;
 
   const logs = await prisma.auditLog.findMany({
     where: actions ? { action: { in: actions } } : {},

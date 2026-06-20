@@ -40,18 +40,6 @@ export function rankForXp(xp: number): string {
   return "Bronze";
 }
 
-/** Normaliza o JSON de skills (null/lixo → base 0; clampa 0-100). */
-function normalizeSkills(raw: unknown): Record<Skill, number> {
-  const base: Record<Skill, number> = { listening: 0, speaking: 0, reading: 0, writing: 0 };
-  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    for (const k of SKILLS) {
-      const v = (raw as Record<string, unknown>)[k];
-      if (typeof v === "number" && Number.isFinite(v)) base[k] = Math.max(0, Math.min(100, v));
-    }
-  }
-  return base;
-}
-
 /** Dia no fuso Brasília como "YYYY-MM-DD" (bucket de streak). */
 function brasiliaDay(d: Date): string {
   return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -87,19 +75,27 @@ async function computeStreak(studentId: string): Promise<number> {
  * do xp já incrementado. Sem perfil → no-op (não quebra a operação principal).
  */
 async function applyXp(studentId: string, xp: number, opts: { skill?: Skill; streak?: number } = {}): Promise<void> {
-  const profile = await prisma.studentProfile.findUnique({ where: { userId: studentId }, select: { skills: true } });
+  const profile = await prisma.studentProfile.findUnique({ where: { userId: studentId }, select: { id: true } });
   if (!profile) return;
 
   const data: Prisma.StudentProfileUpdateInput = { xp: { increment: xp } };
   if (opts.streak !== undefined) data.streak = opts.streak;
-  if (opts.skill) {
-    const skills = normalizeSkills(profile.skills);
-    skills[opts.skill] = Math.min(100, skills[opts.skill] + SKILL_STEP);
-    data.skills = skills as Prisma.InputJsonValue;
-  }
 
   const updated = await prisma.studentProfile.update({ where: { userId: studentId }, data, select: { xp: true } });
   await prisma.studentProfile.update({ where: { userId: studentId }, data: { rank: rankForXp(updated.xp) } });
+
+  // skill: incremento ATÔMICO no JSONB (clampa 100) — evita lost-update entre exercícios
+  // concorrentes do mesmo aluno (o lock de submissão só serializa o MESMO exercício).
+  if (opts.skill) {
+    await prisma.$executeRaw`
+      UPDATE "student_profiles"
+      SET "skills" = jsonb_set(
+        COALESCE("skills", '{}'::jsonb),
+        ARRAY[${opts.skill}],
+        to_jsonb(LEAST(100, COALESCE(NULLIF("skills"->>${opts.skill}, '')::int, 0) + ${SKILL_STEP}))
+      )
+      WHERE "userId" = ${studentId}`;
+  }
 }
 
 /**

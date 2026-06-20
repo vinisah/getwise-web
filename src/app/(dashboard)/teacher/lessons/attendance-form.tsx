@@ -3,11 +3,15 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cx } from "@/lib/utils";
-import { Check, X, Star } from "lucide-react";
+import { Check, X } from "lucide-react";
 
-type Student = { studentId: string; name: string; attendance: boolean | null; rating: number | null };
+type Student = { studentId: string; name: string; attendance: boolean | null };
 
-/** Marca presença (presente/ausente) + avaliação (1-5) por aluno e salva no endpoint. */
+/**
+ * Marca presença (presente/ausente) por aluno e salva no endpoint. NÃO há nota dada pelo
+ * professor: "avaliação média" do professor é feedback dos ALUNOS (feature futura), não
+ * auto-atribuível — senão o professor inflaria a própria nota.
+ */
 export function AttendanceForm({ lessonId, students }: { lessonId: string; students: Student[] }) {
   const [rows, setRows] = useState<Student[]>(students);
   const [saving, setSaving] = useState(false);
@@ -27,7 +31,7 @@ export function AttendanceForm({ lessonId, students }: { lessonId: string; stude
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          entries: rows.map((s) => ({ studentId: s.studentId, attendance: s.attendance, rating: s.rating })),
+          entries: rows.map((s) => ({ studentId: s.studentId, attendance: s.attendance })),
         }),
       });
       if (!res.ok) {
@@ -58,28 +62,6 @@ export function AttendanceForm({ lessonId, students }: { lessonId: string; stude
           >
             <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 600 }}>{s.name}</span>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ display: "flex", gap: 2 }} role="group" aria-label="Avaliação">
-                {[1, 2, 3, 4, 5].map((n) => {
-                  const on = s.rating != null && n <= s.rating;
-                  return (
-                    <button
-                      key={n}
-                      type="button"
-                      aria-label={`${n} estrela${n > 1 ? "s" : ""}`}
-                      onClick={() => patch(s.studentId, { rating: s.rating === n ? null : n })}
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        cursor: "pointer",
-                        padding: 0,
-                        lineHeight: 0,
-                      }}
-                    >
-                      <Star size={15} color={on ? "#FFB24D" : "var(--line)"} fill={on ? "#FFB24D" : "none"} />
-                    </button>
-                  );
-                })}
-              </div>
               <div className="gw-seg-group">
                 <button
                   type="button"

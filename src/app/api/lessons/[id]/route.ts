@@ -74,10 +74,11 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
     return up;
   });
 
-  // Gamificação: XP de aula aos alunos presentes — só na transição p/ COMPLETED. Best-effort.
+  // Gamificação: XP de aula só na transição p/ COMPLETED e só a quem NÃO foi marcado ausente
+  // (attendance != false → presente ou ainda não marcado). Best-effort.
   if (completing) {
     const bookings = await prisma.lessonBooking.findMany({
-      where: { lessonId: id, status: "COMPLETED" },
+      where: { lessonId: id, status: "COMPLETED", attendance: { not: false } },
       select: { studentId: true },
     });
     await Promise.all(bookings.map((b) => awardLesson(b.studentId).catch(() => {})));
