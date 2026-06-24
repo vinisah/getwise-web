@@ -45,7 +45,11 @@ export type AuditAction =
   | "ADD_PREREQUISITE"
   | "REMOVE_PREREQUISITE"
   | "COMPLETE_UNIT"
-  | "ISSUE_CERTIFICATE";
+  | "ISSUE_CERTIFICATE"
+  | "CREATE_PROFILE"
+  | "UPDATE_PROFILE"
+  | "DELETE_PROFILE"
+  | "ASSIGN_PROFILE";
 
 interface AuditParams {
   userId?: string;

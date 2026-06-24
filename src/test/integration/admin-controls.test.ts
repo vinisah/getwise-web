@@ -43,13 +43,19 @@ describe("PATCH /api/users/[id]", () => {
 
   it("admin NÃO rebaixa a si mesmo (anti-lockout)", async () => {
     (mockPrisma.user.findUnique as any).mockResolvedValueOnce({ id: "admin-1", role: "ADMIN" });
-    const res = await userPATCH(req("http://localhost/api/users/admin-1", "PATCH", { role: "STUDENT" }), ctxSelf as any);
+    const res = await userPATCH(
+      req("http://localhost/api/users/admin-1", "PATCH", { role: "STUDENT" }),
+      ctxSelf as any
+    );
     expect(res.status).toBe(400);
   });
 
   it("admin NÃO desativa a si mesmo", async () => {
     (mockPrisma.user.findUnique as any).mockResolvedValueOnce({ id: "admin-1", role: "ADMIN" });
-    const res = await userPATCH(req("http://localhost/api/users/admin-1", "PATCH", { isActive: false }), ctxSelf as any);
+    const res = await userPATCH(
+      req("http://localhost/api/users/admin-1", "PATCH", { isActive: false }),
+      ctxSelf as any
+    );
     expect(res.status).toBe(400);
   });
 
@@ -72,6 +78,39 @@ describe("PATCH /api/users/[id]", () => {
   it("corpo vazio → 400", async () => {
     const res = await userPATCH(req("http://localhost/api/users/u-2", "PATCH", {}), ctxOther as any);
     expect(res.status).toBe(400);
+  });
+
+  it("admin NÃO aplica perfil restrito a si mesmo (anti-lockout)", async () => {
+    (mockPrisma.user.findUnique as any).mockResolvedValueOnce({ id: "admin-1", role: "ADMIN" });
+    const res = await userPATCH(
+      req("http://localhost/api/users/admin-1", "PATCH", { profileId: "p1" }),
+      ctxSelf as any
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("perfil inexistente → 400", async () => {
+    (mockPrisma.user.findUnique as any).mockResolvedValueOnce({ id: "u-2", role: "ADMIN" });
+    (mockPrisma.accessProfile.findUnique as any).mockResolvedValueOnce(null);
+    const res = await userPATCH(req("http://localhost/api/users/u-2", "PATCH", { profileId: "nope" }), ctxOther as any);
+    expect(res.status).toBe(400);
+  });
+
+  it("atribui perfil válido a outro usuário → 200", async () => {
+    (mockPrisma.user.findUnique as any).mockResolvedValueOnce({ id: "u-2", role: "ADMIN" });
+    (mockPrisma.accessProfile.findUnique as any).mockResolvedValueOnce({ id: "p1" });
+    (mockPrisma.user.update as any).mockResolvedValueOnce({ id: "u-2" });
+    const res = await userPATCH(req("http://localhost/api/users/u-2", "PATCH", { profileId: "p1" }), ctxOther as any);
+    expect(res.status).toBe(200);
+    expect((mockPrisma.user.update as any).mock.calls[0][0].data.profileId).toBe("p1");
+  });
+
+  it("demoção de ADMIN limpa o profileId (evita perfil stale numa re-promoção)", async () => {
+    (mockPrisma.user.findUnique as any).mockResolvedValueOnce({ id: "u-2", role: "ADMIN" });
+    (mockPrisma.user.update as any).mockResolvedValueOnce({ id: "u-2", role: "STUDENT" });
+    const res = await userPATCH(req("http://localhost/api/users/u-2", "PATCH", { role: "STUDENT" }), ctxOther as any);
+    expect(res.status).toBe(200);
+    expect((mockPrisma.user.update as any).mock.calls[0][0].data.profileId).toBeNull();
   });
 });
 

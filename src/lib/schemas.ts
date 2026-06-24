@@ -208,10 +208,13 @@ export const UpdateUserSchema = z
     isActive: z.boolean().optional(),
     // Senha temporária definida pelo admin (usuário troca depois).
     password: z.string().min(6, "Mínimo 6 caracteres").max(100).optional(),
+    // RBAC: perfil de acesso (null = dono/sem perfil = acesso total).
+    profileId: z.string().min(1).nullable().optional(),
   })
-  .refine((d) => d.role !== undefined || d.isActive !== undefined || d.password !== undefined, {
-    message: "Nada a atualizar",
-  });
+  .refine(
+    (d) => d.role !== undefined || d.isActive !== undefined || d.password !== undefined || d.profileId !== undefined,
+    { message: "Nada a atualizar" }
+  );
 
 // ─── Recorrência ─────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { ADMIN_PATHS, TEACHER_PATHS, AUTH_PATHS, roleHome } from "@/lib/roles";
+import { sectionForPath, firstAllowedRoute } from "@/lib/access";
 
 // Next 16: convenção `middleware` foi renomeada para `proxy` (roda em Node.js).
 export async function proxy(req: NextRequest) {
@@ -40,6 +41,25 @@ export async function proxy(req: NextRequest) {
     }
     if (TEACHER_PATHS.some((p) => pathname.startsWith(p)) && role !== "TEACHER" && role !== "ADMIN") {
       return NextResponse.redirect(new URL(roleHome(role), req.url));
+    }
+
+    // RBAC: admin com perfil RESTRITO só acessa as seções permitidas (null = dono = tudo).
+    // Enforcement central das PÁGINAS admin (a sidebar também filtra; APIs usam requireAdmin).
+    if (role === "ADMIN" && pathname.startsWith("/admin")) {
+      const sections = (token as { profileSections?: string[] | null }).profileSections;
+      if (sections) {
+        const sec = sectionForPath(pathname);
+        if (sec && !sections.includes(sec)) {
+          const dest = firstAllowedRoute(sections);
+          // Perfil sem nenhuma seção válida (ex.: sections=[]) → firstAllowedRoute cai em /admin
+          // e o gate re-nega → loop de redirect. Corta com 403 em vez de redirecionar p/ a própria
+          // rota negada. Estado normalmente impossível (POST/PATCH exigem min(1) seção).
+          if (dest === pathname) {
+            return new NextResponse("Sem seções de acesso liberadas. Contate o administrador.", { status: 403 });
+          }
+          return NextResponse.redirect(new URL(dest, req.url));
+        }
+      }
     }
   }
 

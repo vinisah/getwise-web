@@ -76,6 +76,7 @@ vi.mock("@/lib/prisma", () => ({
     materialDownload: { upsert: vi.fn() },
     unitVideoProgress: { findUnique: vi.fn(), upsert: vi.fn() },
     notification: { create: vi.fn(), findMany: vi.fn(), count: vi.fn(), updateMany: vi.fn() },
+    accessProfile: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
   },
 }));
 

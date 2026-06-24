@@ -94,6 +94,7 @@ export default async function UnitPage({ params }: { params: Promise<{ id: strin
               videoUrl={unit.videoUrl!}
               initialPosition={vp?.positionSeconds ?? 0}
               initialPercent={vp?.watchedPercent ?? 0}
+              watermark={`${eff.name} · ${eff.id.slice(-6)}`}
             />
           </div>
         )}

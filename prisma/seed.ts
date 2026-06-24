@@ -28,6 +28,21 @@ async function main() {
     },
   });
 
+  // Perfis de acesso (RBAC) — exemplos de sistema. O admin demo fica SEM perfil (= dono/tudo).
+  const SYSTEM_PROFILES = [
+    { name: "Secretaria", sections: ["dashboard", "students", "enrollments", "lessons"] },
+    { name: "Coordenação", sections: ["dashboard", "students", "courses", "lessons", "enrollments"] },
+    { name: "Comercial", sections: ["dashboard", "students", "enrollments", "plans", "receivables"] },
+    { name: "Financeiro", sections: ["dashboard", "financial", "receivables", "payroll", "employees", "dre"] },
+  ];
+  for (const p of SYSTEM_PROFILES) {
+    await prisma.accessProfile.upsert({
+      where: { name: p.name },
+      update: { sections: p.sections, isSystem: true },
+      create: { name: p.name, sections: p.sections, isSystem: true },
+    });
+  }
+
   // Professor
   const teacherPassword = await bcrypt.hash("teacher123", 10);
   const teacher = await prisma.user.upsert({

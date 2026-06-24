@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { useMobileNav } from "@/components/dashboard/mobile-nav";
 import { cx, getInitials } from "@/lib/utils";
+import { adminCanAccess } from "@/lib/access";
 import { Logo } from "@/components/gw/logo";
 import { Avatar } from "@/components/gw/primitives";
 import {
@@ -86,7 +87,14 @@ export function Sidebar({ previewRole, previewName }: { previewRole?: string; pr
   // Em "ver como" (admin), o role/nome efetivos vêm do servidor e dirigem a navegação.
   const role = previewRole || user?.role || "STUDENT";
   const displayName = previewName ?? user?.name;
-  const nav = NAV[role] || NAV.STUDENT;
+  // RBAC: admin com perfil restrito vê só as seções permitidas (null = dono = tudo).
+  const sections = (user as { profileSections?: string[] | null } | undefined)?.profileSections ?? null;
+  let nav = NAV[role] || NAV.STUDENT;
+  if (role === "ADMIN" && sections) {
+    const items = nav.filter((e) => "section" in e || adminCanAccess(sections, (e as { id: string }).id));
+    // remove cabeçalhos de seção sem itens visíveis abaixo
+    nav = items.filter((e, i) => !("section" in e) || (i + 1 < items.length && !("section" in items[i + 1])));
+  }
 
   // Fecha o drawer ao trocar de rota (navegação no mobile).
   useEffect(() => {

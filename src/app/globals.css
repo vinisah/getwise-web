@@ -547,6 +547,31 @@ a {
   background: var(--bg);
 }
 
+/* chip toggle (seleção de seções no RBAC). Classe própria (.gw-chip-toggle): NÃO reusar
+   .gw-chip (definido adiante, venceria a cascata) nem .gw-seg (segmented control acima). */
+.gw-chip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink-2);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.gw-chip-toggle:hover {
+  border-color: var(--accent);
+}
+.gw-chip-toggle.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* cards grid (cursos / planos admin) */
 .gw-cards-grid {
   display: grid;

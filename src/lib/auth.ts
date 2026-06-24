@@ -66,20 +66,23 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = (user as any).role as Role;
         token.id = user.id;
-        return token;
       }
-      // Requests subsequentes: revalida no DB (desativação/rebaixamento valem em tempo
-      // real; o token sozinho ficaria defasado por até 1 dia). 1 lookup por PK indexada.
+      // Login E requests subsequentes: revalida no DB e popula profileSections (RBAC).
+      // No login NÃO retorna cedo — senão o 1º request ficaria sem profileSections e o gate
+      // do proxy seria pulado uma vez. Revalidação tb cobre desativação/rebaixamento em tempo
+      // real (token sozinho ficaria defasado por até 1 dia). 1 lookup por PK indexada.
       if (token.id) {
         const db = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { isActive: true, role: true },
+          select: { isActive: true, role: true, profile: { select: { sections: true } } },
         });
         if (!db || !db.isActive) {
           (token as any).disabled = true;
         } else {
           (token as any).disabled = false;
           token.role = db.role;
+          // RBAC: null = dono (acesso total); array = seções permitidas.
+          (token as any).profileSections = db.profile?.sections ?? null;
         }
       }
       return token;
@@ -92,6 +95,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).role = token.role as Role;
         (session.user as any).id = token.id as string;
+        (session.user as any).profileSections = ((token as any).profileSections ?? null) as string[] | null;
       }
       return session;
     },

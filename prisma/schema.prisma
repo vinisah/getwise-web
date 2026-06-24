@@ -101,6 +101,7 @@ model User {
   role          Role      @default(STUDENT)
   isActive      Boolean   @default(true) // false = login bloqueado (desativado pelo admin)
   uiPrefs       Json?     // preferências de tema/aparência (TweaksPanel); cookie é a fonte ao vivo
+  profileId     String?   // RBAC: perfil de acesso (só p/ ADMIN). null = dono (acesso total).
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -124,6 +125,7 @@ model User {
   videoProgress     UnitVideoProgress[]
   materialDownloads MaterialDownload[]
   notifications     Notification[]
+  profile           AccessProfile?      @relation(fields: [profileId], references: [id], onDelete: SetNull)
 
   // role filtrado em listagens (students/teachers) e KPIs do dashboard; name serve o orderBy junto.
   @@index([role, name])
@@ -732,6 +734,24 @@ model Notification {
   @@index([userId, readAt])
   @@index([userId, createdAt])
   @@map("notifications")
+}
+
+/**
+ * RBAC: perfil de acesso do staff (ADMIN). `sections` = chaves das seções do painel que o
+ * perfil pode acessar (ver lib/admin-sections.ts). Usuário sem perfil (profileId null) = dono
+ * = acesso total. isSystem marca perfis semeados (não apagáveis pela UI).
+ */
+model AccessProfile {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  sections  String[]
+  isSystem  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+
+  @@map("access_profiles")
 }
 
 model PasswordResetToken {

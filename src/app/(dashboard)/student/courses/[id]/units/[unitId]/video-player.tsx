@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MediaShield } from "@/components/gw/media-shield";
 
 /**
  * Detecta o tipo de vídeo a partir da URL.
@@ -36,12 +37,14 @@ export function VideoPlayer({
   videoUrl,
   initialPosition,
   initialPercent,
+  watermark,
   onUnlock,
 }: {
   unitId: string;
   videoUrl: string;
   initialPosition: number;
   initialPercent: number;
+  watermark: string;
   onUnlock?: () => void;
 }) {
   const router = useRouter();
@@ -58,7 +61,10 @@ export function VideoPlayer({
       const res = await fetch(`/api/units/${unitId}/video-progress`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ positionSeconds: Math.floor(positionSeconds), watchedPercent: Math.floor(watchedPercent) }),
+        body: JSON.stringify({
+          positionSeconds: Math.floor(positionSeconds),
+          watchedPercent: Math.floor(watchedPercent),
+        }),
         keepalive: true,
       });
       const data = await res.json();
@@ -116,26 +122,68 @@ export function VideoPlayer({
 
   return (
     <div>
-      {video.kind === "file" ? (
-        <video ref={ref} src={video.src} controls style={{ width: "100%", borderRadius: "var(--r-sm)", background: "#000" }} />
-      ) : (
-        <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", borderRadius: "var(--r-sm)", overflow: "hidden", background: "#000" }}>
-          <iframe
+      <MediaShield
+        label={watermark}
+        onObscureChange={(o) => {
+          if (o) ref.current?.pause();
+        }}
+      >
+        {video.kind === "file" ? (
+          <video
+            ref={ref}
             src={video.src}
-            title="Vídeo da unidade"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-            allowFullScreen
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
+            controls
+            controlsList="nodownload"
+            disablePictureInPicture
+            style={{ width: "100%", borderRadius: "var(--r-sm)", background: "#000", display: "block" }}
           />
-        </div>
-      )}
+        ) : (
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              aspectRatio: "16 / 9",
+              borderRadius: "var(--r-sm)",
+              overflow: "hidden",
+              background: "#000",
+            }}
+          >
+            <iframe
+              src={video.src}
+              title="Vídeo da unidade"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+              allowFullScreen
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
+            />
+          </div>
+        )}
+      </MediaShield>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
         <div className="gw-meter" style={{ flex: 1, minWidth: 160 }}>
-          <span style={{ width: `${Math.min(100, percent)}%`, background: unlocked ? "var(--success)" : "var(--accent)" }} />
+          <span
+            style={{ width: `${Math.min(100, percent)}%`, background: unlocked ? "var(--success)" : "var(--accent)" }}
+          />
         </div>
-        <span style={{ fontSize: 13, fontWeight: 700, color: unlocked ? "var(--success)" : "var(--ink-2)", display: "flex", alignItems: "center", gap: 5 }}>
-          {unlocked ? <><CheckCircle size={15} /> Liberado</> : <><Lock size={14} /> {Math.floor(percent)}% / 90%</>}
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: unlocked ? "var(--success)" : "var(--ink-2)",
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+          }}
+        >
+          {unlocked ? (
+            <>
+              <CheckCircle size={15} /> Liberado
+            </>
+          ) : (
+            <>
+              <Lock size={14} /> {Math.floor(percent)}% / 90%
+            </>
+          )}
         </span>
         {video.kind === "embed" && !unlocked && (
           <Button size="sm" variant="outline" disabled={saving} onClick={confirmWatched}>
