@@ -78,9 +78,29 @@ export async function assignStudent(studentId: string, transaction?: Prisma.Tran
         },
       },
     });
+    const existingBookings = await tx.lessonBooking.findMany({
+      where: {
+        studentId,
+        status: { not: "CANCELLED" },
+        lesson: { scheduledAt: { gt: new Date() }, status: "SCHEDULED" },
+      },
+      include: { lesson: true },
+    });
     const available = cohorts.filter(
-      (c) =>
-        c._count.students < c.capacity && c.lessons.length && c.lessons.every((l) => l._count.bookings < l.maxStudents)
+      (cohort) =>
+        cohort._count.students < cohort.capacity &&
+        cohort.lessons.length > 0 &&
+        cohort.lessons.every((lesson) => {
+          const alreadyBooked = existingBookings.some((booking) => booking.lessonId === lesson.id);
+          const occupied = lesson._count.bookings - Number(alreadyBooked);
+          const conflicting = existingBookings.some(
+            (booking) =>
+              booking.lessonId !== lesson.id &&
+              booking.lesson.scheduledAt.getTime() < lesson.scheduledAt.getTime() + lesson.duration * 60000 &&
+              booking.lesson.scheduledAt.getTime() + booking.lesson.duration * 60000 > lesson.scheduledAt.getTime()
+          );
+          return occupied < lesson.maxStudents && !conflicting;
+        })
     );
     if (!available.length)
       throw new ApiError(409, "Nenhuma turma do nível do aluno tem vaga. Cadastre uma turma ou libere vagas.");

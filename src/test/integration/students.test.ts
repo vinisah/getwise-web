@@ -92,7 +92,7 @@ describe("POST /api/students", () => {
         update: vi.fn().mockResolvedValue({ cohortId: "cohort-1" }),
       },
       cohort: { findMany: vi.fn().mockResolvedValue([{ id: "cohort-1", capacity: 8, _count: { students: 1 }, lessons: [{ id: "lesson-1", maxStudents: 8, _count: { bookings: 1 } }] }]) },
-      lessonBooking: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      lessonBooking: { findMany: vi.fn().mockResolvedValue([]), createMany: vi.fn().mockResolvedValue({ count: 1 }) },
     };
     (mockPrisma.$transaction as any).mockImplementationOnce((callback: any) => callback(transaction));
     (mockPrisma.auditLog.create as any).mockResolvedValueOnce({});
