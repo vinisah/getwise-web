@@ -25,7 +25,7 @@ function bucketOf(days: number): AgingBucket | null {
  * GET /api/payments?status= — mensalidades com aging de inadimplência.
  */
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  await requireAdmin();
+  await requireAdmin("receivables");
 
   const { searchParams } = new URL(req.url);
   const rawStatus = searchParams.get("status");

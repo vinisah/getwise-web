@@ -11,7 +11,7 @@ type Ctx = { params: Promise<{ id: string }> };
  * e retorna a URL do arquivo. Edge: re-download atualiza o timestamp (upsert).
  */
 export const POST = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAuth();
+  const session = await requireAuth("courses");
   const { id: materialId } = await (ctx as Ctx).params;
 
   const material = await prisma.unitMaterial.findUnique({ where: { id: materialId } });

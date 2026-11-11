@@ -4,11 +4,11 @@ import { requireAuth } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 
 export const GET = withErrorHandler(async (_req: NextRequest) => {
-  await requireAuth();
+  await requireAuth("lessons");
 
   const teachers = await prisma.user.findMany({
     where: { role: "TEACHER" },
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
 

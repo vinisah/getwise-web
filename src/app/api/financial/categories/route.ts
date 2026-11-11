@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-error";
-import { requireAuth, requireAdmin } from "@/lib/api-auth";
+import { requireAdmin } from "@/lib/api-auth";
 import { CreateCategorySchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 
 export const GET = withErrorHandler(async (_req: NextRequest) => {
-  await requireAuth();
+  await requireAdmin("financial");
 
   const categories = await prisma.financialCategory.findMany({ orderBy: { name: "asc" } });
   return NextResponse.json(categories);
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  await requireAdmin();
+  await requireAdmin("financial");
 
   const parsed = CreateCategorySchema.safeParse(await req.json());
   if (!parsed.success) {

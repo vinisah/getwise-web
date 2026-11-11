@@ -11,7 +11,7 @@ type Ctx = { params: Promise<{ id: string }> };
  * GET /api/salary-payments/[id]/receipt — holerite simplificado em PDF.
  */
 export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
-  await requireAdmin();
+  await requireAdmin("payroll");
   const { id } = await (ctx as Ctx).params;
 
   const sp = await prisma.salaryPayment.findUnique({

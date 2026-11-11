@@ -10,7 +10,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 /** GET /api/units/[id]/materials — lista materiais (PDF) da unidade. */
 export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAuth();
+  const session = await requireAuth("courses");
   const { id: unitId } = await (ctx as Ctx).params;
 
   // Aluno só vê materiais de unidade desbloqueada (gate).
@@ -28,7 +28,7 @@ export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
 
 /** POST /api/units/[id]/materials — admin adiciona material (PDF) à unidade. */
 export const POST = withErrorHandler(async (req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("courses");
   const { id: unitId } = await (ctx as Ctx).params;
 
   const parsed = CreateMaterialSchema.omit({ unitId: true }).safeParse(await req.json());
@@ -47,7 +47,7 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx) => {
 
 /** DELETE /api/units/[id]/materials?materialId=... — admin remove material. */
 export const DELETE = withErrorHandler(async (req: NextRequest, ctx) => {
-  await requireAdmin();
+  await requireAdmin("courses");
   await (ctx as Ctx).params;
   const materialId = req.nextUrl.searchParams.get("materialId");
   if (!materialId) return NextResponse.json({ error: "materialId obrigatório" }, { status: 400 });

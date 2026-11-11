@@ -14,7 +14,7 @@ import { prisma } from "@/lib/prisma";
  * ou gerar fora de ordem não duplica, pois a chave não depende do mês predecessor.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("financial");
 
   const parsed = GenerateRecurringSchema.safeParse(await req.json());
   if (!parsed.success) {

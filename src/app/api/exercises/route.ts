@@ -6,8 +6,9 @@ import { ApiError } from "@/lib/api-error";
 import { getEffectiveUser } from "@/lib/effective-user";
 import { CreateExerciseSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
+import { adminCanAccess } from "@/lib/access";
 
-const LevelEnum = z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]);
+const LevelEnum = z.enum(["A1", "A2", "A3", "B1", "B2", "C1", "C2"]);
 const TypeEnum = z.enum([
   "MULTIPLE_CHOICE",
   "FILL_IN_BLANK",
@@ -25,6 +26,9 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   // Identidade efetiva: aluno real OU admin "vendo como" aluno (read-only).
   const eff = await getEffectiveUser();
   if (!eff) throw new ApiError(401, "Não autenticado");
+  if (eff.role === "ADMIN" && !adminCanAccess(eff.profileSections, "courses")) {
+    throw new ApiError(403, "Seu perfil não tem permissão para esta operação");
+  }
 
   const { searchParams } = new URL(req.url);
   const rawLevel = searchParams.get("level");
@@ -72,7 +76,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAuth();
+  const session = await requireAuth("courses");
 
   if (session.user.role === "STUDENT") {
     throw new ApiError(403, "Não autorizado");

@@ -28,7 +28,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (user) {
     const token = createToken();
     await prisma.passwordResetToken.create({ data: { email, token, expires: expiresIn(1) } });
-    await sendPasswordResetEmail(email, token);
+    try {
+      await sendPasswordResetEmail(email, token);
+    } catch (error) {
+      // Falha de SMTP também preserva resposta genérica (não enumera contas).
+      console.error("[PASSWORD RESET EMAIL]", error instanceof Error ? error.name : "UnknownError");
+    }
   }
 
   return NextResponse.json({

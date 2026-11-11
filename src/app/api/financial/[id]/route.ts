@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 type Ctx = { params: Promise<{ id: string }> };
 
 export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
-  await requireAdmin();
+  await requireAdmin("financial");
   const { id } = await (ctx as Ctx).params;
 
   const transaction = await prisma.financialTransaction.findUnique({
@@ -20,7 +20,7 @@ export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
 });
 
 export const PUT = withErrorHandler(async (req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("financial");
   const { id } = await (ctx as Ctx).params;
 
   const parsed = UpdateTransactionSchema.safeParse(await req.json());
@@ -61,7 +61,7 @@ export const PUT = withErrorHandler(async (req: NextRequest, ctx) => {
 });
 
 export const DELETE = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("financial");
   const { id } = await (ctx as Ctx).params;
 
   await prisma.financialTransaction.delete({ where: { id } });

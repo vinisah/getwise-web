@@ -22,7 +22,7 @@ export default async function StudentLessonsPage() {
   const user = { id: eff.id, role: eff.role as string };
 
   const lessons = await prisma.lesson.findMany({
-    where: { bookings: { some: { studentId: user.id } } },
+    where: { bookings: { some: { studentId: user.id, status: { not: "CANCELLED" } } } },
     include: {
       teacher: { select: { name: true } },
       bookings: { where: { studentId: user.id }, select: { attendance: true } },

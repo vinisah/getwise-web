@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 type Ctx = { params: Promise<{ id: string }> };
 
 export const POST = withErrorHandler(async (req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("courses");
   const { id: courseId } = await (ctx as Ctx).params;
 
   const parsed = CoursePrereqSchema.safeParse(await req.json());
@@ -32,7 +32,7 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx) => {
 });
 
 export const DELETE = withErrorHandler(async (req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("courses");
   const { id: courseId } = await (ctx as Ctx).params;
   const requiredCourseId = req.nextUrl.searchParams.get("requiredCourseId");
 

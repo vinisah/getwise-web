@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { proxy } from "@/proxy";
+import { prisma } from "@/lib/prisma";
 
 // getToken já é mockado globalmente em test/setup.ts.
 const mockToken = vi.mocked(getToken);
@@ -12,9 +13,32 @@ function go(path: string) {
 
 beforeEach(() => {
   mockToken.mockReset();
+  vi.mocked(prisma.user.findUnique).mockImplementation((args) => {
+    const sections: Record<string, string[] | null> = { a1: null, a2: ["financial"], a3: ["dashboard"], a4: [] };
+    const currentSections = sections[args.where.id ?? ""];
+    return Promise.resolve({ isActive: true, role: args.where.id === "s1" ? "STUDENT" : "ADMIN", profile: currentSections == null ? null : { sections: currentSections } }) as never;
+  });
 });
 
 describe("proxy — gate RBAC de páginas admin", () => {
+  it("revoga acesso mesmo quando o JWT ainda declara dono", async () => {
+    mockToken.mockResolvedValueOnce({ id: "a3", role: "ADMIN", profileSections: null } as never);
+    const res = await go("/admin/financial");
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/admin");
+  });
+
+  it("rebaixamento no banco impede abrir página administrativa", async () => {
+    mockToken.mockResolvedValueOnce({ id: "s1", role: "ADMIN", profileSections: null } as never);
+    const res = await go("/admin/students");
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/student");
+  });
+
+  it("conta desativada não usa token antigo para abrir o painel", async () => {
+    mockToken.mockResolvedValueOnce({ id: "a1", role: "ADMIN" } as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({ isActive: false } as never);
+    const res = await go("/admin");
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/login");
+  });
   it("sem token em página protegida → redirect /login", async () => {
     mockToken.mockResolvedValueOnce(null as never);
     const res = await go("/admin/financial");

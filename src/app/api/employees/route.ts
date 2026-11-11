@@ -6,7 +6,7 @@ import { CreateEmployeeSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 
 export const GET = withErrorHandler(async (_req: NextRequest) => {
-  await requireAdmin();
+  await requireAdmin("employees");
 
   const employees = await prisma.employee.findMany({
     orderBy: { name: "asc" },
@@ -22,7 +22,7 @@ export const GET = withErrorHandler(async (_req: NextRequest) => {
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("employees");
 
   const parsed = CreateEmployeeSchema.safeParse(await req.json());
   if (!parsed.success) {

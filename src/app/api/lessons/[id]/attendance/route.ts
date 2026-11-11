@@ -27,7 +27,7 @@ const Schema = z.object({
  * (lessonId, studentId) só toca bookings reais desta aula (id estranho atualiza 0 linhas).
  */
 export const POST = withErrorHandler(async (req: NextRequest, ctx) => {
-  const session = await requireAuth();
+  const session = await requireAuth("lessons");
   const { id } = await (ctx as Ctx).params;
 
   if (session.user.role !== "ADMIN" && session.user.role !== "TEACHER") {

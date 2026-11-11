@@ -1,3 +1,4 @@
+import { assignStudent, schedulingTransaction } from "@/lib/scheduling/service";
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler, zodMessage } from "@/lib/api-error";
 import { requireAdmin } from "@/lib/api-auth";
@@ -7,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("students");
 
   const parsed = CreateStudentSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -23,7 +24,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const user = await prisma.user.create({
+  const user = await schedulingTransaction(async (tx) => {
+  const created = await tx.user.create({
     data: {
       name,
       email,
@@ -46,6 +48,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     },
     include: { studentProfile: true },
   });
+  if (["A1", "A2", "A3"].includes(level)) await assignStudent(created.id, tx);
+  return created;
+  });
 
   await audit({ userId: session.user.id, action: "CREATE_STUDENT", entity: "Student", entityId: user.id });
 
@@ -53,7 +58,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 });
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  await requireAdmin();
+  await requireAdmin("students");
 
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? "";

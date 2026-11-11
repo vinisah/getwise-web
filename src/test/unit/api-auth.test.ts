@@ -23,6 +23,25 @@ describe("requireAuth", () => {
 });
 
 describe("requireAdmin", () => {
+  it("nega acesso direto à API de outra seção", async () => {
+    mockGetServerSession.mockResolvedValueOnce({ user: { ...adminSession.user, profileSections: ["courses"] } } as any);
+    await expect(requireAdmin("financial")).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("permite a seção atribuída", async () => {
+    mockGetServerSession.mockResolvedValueOnce({ user: { ...adminSession.user, profileSections: ["financial"] } } as any);
+    await expect(requireAdmin("financial")).resolves.toBeDefined();
+  });
+
+  it("perfil users não permite conceder privilégios de dono", async () => {
+    mockGetServerSession.mockResolvedValueOnce({ user: { ...adminSession.user, profileSections: ["users"] } } as any);
+    await expect(requireAdmin()).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("rotas mistas também aplicam as seções ao administrador", async () => {
+    mockGetServerSession.mockResolvedValueOnce({ user: { ...adminSession.user, profileSections: ["courses"] } } as any);
+    await expect(requireAuth("lessons")).rejects.toMatchObject({ status: 403 });
+  });
   it("passes for ADMIN role", async () => {
     mockGetServerSession.mockResolvedValueOnce(adminSession as any);
     await expect(requireAdmin()).resolves.toBeDefined();

@@ -34,6 +34,17 @@ describe("POST /api/auth/register", () => {
     (mockPrisma.user.findUnique as any).mockResolvedValueOnce(null);
     (mockPrisma.user.create as any).mockResolvedValueOnce({ id: "new1", email: "novo@n.com" });
     (mockPrisma.emailVerificationToken.create as any).mockResolvedValueOnce({});
+    const transaction = {
+      user: mockPrisma.user,
+      $executeRawUnsafe: vi.fn().mockResolvedValue(1),
+      studentProfile: {
+        findUnique: vi.fn().mockResolvedValue({ userId: "new1", level: "A1", cohortId: null, user: { role: "STUDENT", isActive: true } }),
+        update: vi.fn().mockResolvedValue({ cohortId: "cohort-1" }),
+      },
+      cohort: { findMany: vi.fn().mockResolvedValue([{ id: "cohort-1", capacity: 8, _count: { students: 1 }, lessons: [{ id: "lesson-1", maxStudents: 8, _count: { bookings: 1 } }] }]) },
+      lessonBooking: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    };
+    (mockPrisma.$transaction as any).mockImplementationOnce((callback: any) => callback(transaction));
     (mockPrisma.auditLog.create as any).mockResolvedValueOnce({});
     const res = await POST(req({ name: "Novo Aluno", email: "novo@n.com", password: "senha123" }, "ip-c"));
     expect(res.status).toBe(201);

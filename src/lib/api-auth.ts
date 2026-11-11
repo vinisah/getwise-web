@@ -10,23 +10,36 @@ import type { SessionUser, UserRole } from "@/types";
  * Revogação em tempo real (desativação/rebaixamento de role) é aplicada no callback
  * `jwt`/`session` do NextAuth (ver lib/auth.ts), que re-checa o DB a cada getServerSession.
  */
-export async function requireAuth(): Promise<{ user: SessionUser }> {
+export async function requireAuth(...adminSections: string[]): Promise<{ user: SessionUser }> {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     throw new ApiError(401, "Não autenticado");
+  }
+  // As permissões vêm da sessão revalidada no banco, nunca do corpo da requisição.
+  if (session.user.role === "ADMIN" && adminSections.length) {
+    assertAdminSections(session.user, adminSections);
   }
   return session as { user: SessionUser };
 }
 
 /**
- * Exige role ADMIN; lança ApiError(403) caso contrário.
+ * Exige ADMIN com uma das seções indicadas; sem seção exige dono (sem perfil restrito).
  */
-export async function requireAdmin(): Promise<{ user: SessionUser }> {
+export async function requireAdmin(...sections: string[]): Promise<{ user: SessionUser }> {
   const session = await requireAuth();
   if (session.user.role !== "ADMIN") {
     throw new ApiError(403, "Acesso restrito a administradores");
   }
+  assertAdminSections(session.user, sections);
   return session;
+}
+
+/** Sem seção explícita, exige dono. Gerir privilégios/impersonar não é delegável. */
+function assertAdminSections(user: SessionUser, sections: string[]): void {
+  if (user.profileSections == null) return;
+  if (!sections.some((section) => user.profileSections!.includes(section))) {
+    throw new ApiError(403, "Seu perfil não tem permissão para esta operação");
+  }
 }
 
 /**

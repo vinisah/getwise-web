@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { ADMIN_PATHS, TEACHER_PATHS, AUTH_PATHS, roleHome } from "@/lib/roles";
 import { sectionForPath, firstAllowedRoute } from "@/lib/access";
+import { prisma } from "@/lib/prisma";
 
 // Next 16: convenção `middleware` foi renomeada para `proxy` (roda em Node.js).
 export async function proxy(req: NextRequest) {
@@ -28,7 +29,19 @@ export async function proxy(req: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    const role = token.role as string | undefined;
+    let role = token.role as string | undefined;
+    let sections = (token as { profileSections?: string[] | null }).profileSections;
+    // Páginas consultam o banco diretamente. Não podem autorizar usando um JWT antigo
+    // depois que o dono remove uma permissão ou rebaixa/desativa a conta.
+    if (!pathname.startsWith("/api/")) {
+      const current = typeof token.id === "string" ? await prisma.user.findUnique({
+        where: { id: token.id },
+        select: { isActive: true, role: true, profile: { select: { sections: true } } },
+      }) : null;
+      if (!current?.isActive) return NextResponse.redirect(new URL("/login", req.url));
+      role = current.role;
+      sections = current.profile?.sections ?? null;
+    }
 
     // Raiz: roteia direto p/ a home do papel (mata a cadeia / → /login → role-home).
     if (isRoot) {
@@ -44,9 +57,8 @@ export async function proxy(req: NextRequest) {
     }
 
     // RBAC: admin com perfil RESTRITO só acessa as seções permitidas (null = dono = tudo).
-    // Enforcement central das PÁGINAS admin (a sidebar também filtra; APIs usam requireAdmin).
+    // PÁGINAS admin usam permissões atuais; APIs também exigem a seção em api-auth.ts.
     if (role === "ADMIN" && pathname.startsWith("/admin")) {
-      const sections = (token as { profileSections?: string[] | null }).profileSections;
       if (sections) {
         const sec = sectionForPath(pathname);
         if (sec && !sections.includes(sec)) {
@@ -75,6 +87,8 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
+    // IDs/rotas protegidas com sufixo de imagem não podem escapar do controle.
+    "/api/:path*", "/admin/:path*", "/teacher/:path*", "/student/:path*",
     // Todas as rotas exceto assets estáticos e _next interno
     "/((?!_next/static|_next/image|favicon.ico|.*\\.png|.*\\.svg|.*\\.jpg|.*\\.jpeg|.*\\.webp).*)",
   ],

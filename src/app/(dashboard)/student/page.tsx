@@ -27,7 +27,7 @@ export default async function StudentDashboard() {
 
   const [upcomingLessons, recentAttempts, profile, enrollment, weekAttempts] = await Promise.all([
     prisma.lessonBooking.findMany({
-      where: { studentId: user.id, lesson: { scheduledAt: { gte: new Date() }, status: "SCHEDULED" } },
+      where: { studentId: user.id, status: { not: "CANCELLED" }, lesson: { scheduledAt: { gte: new Date() }, status: "SCHEDULED" } },
       include: { lesson: { include: { teacher: true } } },
       orderBy: { lesson: { scheduledAt: "asc" } },
       take: 3,

@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ id: string }> };
  * Acesso: dono do certificado ou admin (least privilege).
  */
 export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAuth();
+  const session = await requireAuth("courses");
   const { id } = await (ctx as Ctx).params;
 
   const cert = await prisma.certificate.findUnique({ where: { id } });

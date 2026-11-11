@@ -20,8 +20,11 @@ async function handle(req: NextRequest) {
 
   let actor = "cron";
   if (!isCron) {
+    if (req.method === "GET") {
+      return NextResponse.json({ error: "GET exige autenticação do cron; use POST para disparo manual" }, { status: 405, headers: { Allow: "POST" } });
+    }
     // Não é o cron → exige admin (lança 403 se não for).
-    const session = await requireAdmin();
+    const session = await requireAdmin("receivables");
     actor = session.user.id;
   }
 

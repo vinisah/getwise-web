@@ -21,7 +21,7 @@ export default async function TeacherLessonsPage() {
 
   const lessons = await prisma.lesson.findMany({
     where: { teacherId: eff.id },
-    include: { bookings: { include: { student: { select: { id: true, name: true } } } } },
+    include: { bookings: { where: { status: { not: "CANCELLED" } }, include: { student: { select: { id: true, name: true } } } } },
     orderBy: { scheduledAt: "desc" },
   });
 

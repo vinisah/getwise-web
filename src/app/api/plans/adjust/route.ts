@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
  * matrículas existentes mantêm o preço do plano vigente via relação.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("plans");
 
   const parsed = AdjustPlansSchema.safeParse(await req.json());
   if (!parsed.success) {

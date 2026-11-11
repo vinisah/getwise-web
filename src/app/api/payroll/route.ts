@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma";
  * Por funcionário ativo: cálculo completo + parcelas já registradas no mês.
  */
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  await requireAdmin();
+  await requireAdmin("payroll");
 
   const { searchParams } = new URL(req.url);
   const parsed = MonthYearQuerySchema.safeParse({
