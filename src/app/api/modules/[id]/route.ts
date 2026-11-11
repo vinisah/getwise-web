@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 type Ctx = { params: Promise<{ id: string }> };
 
 export const PUT = withErrorHandler(async (req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("courses");
   const { id } = await (ctx as Ctx).params;
 
   const parsed = UpdateModuleSchema.safeParse(await req.json());
@@ -31,7 +31,7 @@ export const PUT = withErrorHandler(async (req: NextRequest, ctx) => {
 });
 
 export const DELETE = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("courses");
   const { id } = await (ctx as Ctx).params;
 
   // Protege histórico do aluno: excluir o módulo cascateia units→exercises→tentativas/progresso.

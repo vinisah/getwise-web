@@ -25,7 +25,7 @@ function daysOverdueBrasilia(dueDate: Date, now: number): number {
  * PENDING → limpa paidAt/amountPaid + remove a receita.
  */
 export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("receivables");
   const { id } = await (ctx as Ctx).params;
 
   const parsed = MarkPaymentSchema.safeParse(await req.json());

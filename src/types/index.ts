@@ -8,6 +8,7 @@ export interface SessionUser {
   email: string;
   role: UserRole;
   image?: string | null;
+  profileSections?: string[] | null;
 }
 
 export type ApiResponse<T> = { data: T } | { error: string };

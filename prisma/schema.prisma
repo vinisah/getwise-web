@@ -80,6 +80,7 @@ enum UnitType {
 }
 
 enum CEFRLevel {
+  A3
   A1
   A2
   B1
@@ -175,6 +176,9 @@ model VerificationToken {
 // ─── Perfis ───────────────────────────────────────────────────────────────────
 
 model StudentProfile {
+  whatsappOptIn Boolean @default(false)
+  cohortId String?
+  cohort Cohort? @relation(fields: [cohortId], references: [id])
   id               String          @id @default(cuid())
   userId           String          @unique
   birthDate        DateTime?
@@ -259,6 +263,8 @@ model Enrollment {
 // ─── Aulas ────────────────────────────────────────────────────────────────────
 
 model Lesson {
+  cohortId String?
+  cohort Cohort? @relation(fields: [cohortId], references: [id])
   id          String          @id @default(cuid())
   teacherId   String
   title       String
@@ -283,6 +289,10 @@ model Lesson {
 }
 
 model LessonBooking {
+  confirmation String @default("PENDING")
+  absenceReason String?
+  reminderSentAt DateTime?
+  responseToken String @unique @default(cuid())
   id        String       @id @default(cuid())
   lessonId  String
   studentId String
@@ -774,4 +784,19 @@ model EmailVerificationToken {
 
   @@index([email])
   @@map("email_verification_tokens")
+}
+
+model Cohort {
+  id String @id @default(cuid())
+  name String
+  level CEFRLevel
+  capacity Int
+  createdAt DateTime @default(now())
+  students StudentProfile[]
+  lessons Lesson[]
+}
+
+model WhatsAppEvent {
+  id String @id
+  createdAt DateTime @default(now())
 }

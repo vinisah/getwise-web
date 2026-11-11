@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCachedSession } from "@/lib/effective-user";
+
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Card, Badge } from "@/components/gw/primitives";
@@ -8,7 +8,7 @@ import { Check } from "lucide-react";
 import { AdjustPlansButton } from "./adjust-button";
 
 export default async function PlansPage() {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
   const plans = await prisma.plan.findMany({

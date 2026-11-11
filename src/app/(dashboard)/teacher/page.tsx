@@ -26,7 +26,7 @@ export default async function TeacherDashboard() {
   const [lessons, classFreq, rating] = await Promise.all([
     prisma.lesson.findMany({
       where: { teacherId: user.id },
-      include: { bookings: { include: { student: { select: { id: true, name: true } } } } },
+      include: { bookings: { where: { status: { not: "CANCELLED" } }, include: { student: { select: { id: true, name: true } } } } },
       orderBy: { scheduledAt: "asc" },
     }),
     teacherClassFrequency(user.id),

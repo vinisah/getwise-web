@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCachedSession } from "@/lib/effective-user";
+
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
@@ -8,7 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import { ProfilesManager } from "./profiles-manager";
 
 export default async function ProfilesPage() {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
   const profiles = await prisma.accessProfile.findMany({

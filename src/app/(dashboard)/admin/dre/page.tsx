@@ -1,6 +1,6 @@
 import { Fragment } from "react";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCachedSession } from "@/lib/effective-user";
+
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
@@ -20,7 +20,7 @@ import { Download, FileBarChart, AlertTriangle } from "lucide-react";
 type SP = { month?: string; year?: string; regime?: string };
 
 export default async function DrePage({ searchParams }: { searchParams: Promise<SP> }) {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
   const now = new Date();

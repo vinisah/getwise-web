@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler, ApiError } from "@/lib/api-error";
 import { getEffectiveUser } from "@/lib/effective-user";
 import { prisma } from "@/lib/prisma";
+import { adminCanAccess } from "@/lib/access";
 
 export type SearchHit = { type: string; id: string; title: string; sub?: string; href: string };
 
@@ -20,28 +21,29 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const hits: SearchHit[] = [];
 
   if (eff.role === "ADMIN") {
+    const can = (section: string) => adminCanAccess(eff.profileSections, section);
     const [students, courses, lessons, plans, employees] = await Promise.all([
-      prisma.user.findMany({
+      can("students") ? prisma.user.findMany({
         where: { role: "STUDENT", OR: [{ name: ci }, { email: ci }] },
         select: { id: true, name: true, email: true },
         take: 5,
-      }),
-      prisma.course.findMany({
+      }) : [],
+      can("courses") ? prisma.course.findMany({
         where: { OR: [{ title: ci }, { description: ci }] },
         select: { id: true, title: true, level: true },
         take: 5,
-      }),
-      prisma.lesson.findMany({ where: { title: ci }, select: { id: true, title: true }, take: 5 }),
-      prisma.plan.findMany({
+      }) : [],
+      can("lessons") ? prisma.lesson.findMany({ where: { title: ci }, select: { id: true, title: true }, take: 5 }) : [],
+      can("plans") ? prisma.plan.findMany({
         where: { OR: [{ name: ci }, { description: ci }] },
         select: { id: true, name: true },
         take: 5,
-      }),
-      prisma.employee.findMany({
+      }) : [],
+      can("employees") ? prisma.employee.findMany({
         where: { OR: [{ name: ci }, { role: ci }] },
         select: { id: true, name: true, role: true },
         take: 5,
-      }),
+      }) : [],
     ]);
     students.forEach((s) =>
       hits.push({ type: "Aluno", id: s.id, title: s.name, sub: s.email, href: `/admin/students/${s.id}` })

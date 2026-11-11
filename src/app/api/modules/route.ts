@@ -6,7 +6,7 @@ import { CreateModuleSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("courses");
 
   const parsed = CreateModuleSchema.safeParse(await req.json());
   if (!parsed.success) {

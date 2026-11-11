@@ -2,8 +2,8 @@ import { ADMIN_SECTIONS } from "./admin-sections";
 
 /**
  * RBAC do painel admin. Regra: `profileSections == null` (usuário sem perfil) = DONO = acesso
- * total. Com perfil, só as seções listadas. Não-ADMIN nunca tem seção. Enforcement central no
- * proxy.ts (não em cada página) + filtro da sidebar.
+ * total. Com perfil, só as seções listadas. Não-ADMIN nunca tem seção. Páginas usam
+ * proxy.ts com revalidação no banco; APIs usam api-auth.ts; a sidebar apenas filtra links.
  */
 
 /** Seção a que um path /admin pertence (null = rota não-gated). */

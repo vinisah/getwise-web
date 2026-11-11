@@ -40,6 +40,7 @@ const NAV: Record<string, NavEntry[]> = {
     { id: "enrollments", label: "Matrículas", href: "/admin/enrollments", icon: GraduationCap },
     { id: "plans", label: "Planos", href: "/admin/plans", icon: Tag },
     { id: "lessons", label: "Aulas", href: "/admin/lessons", icon: Calendar },
+    { id: "lessons", label: "Turmas e agenda", href: "/admin/lessons/turmas", icon: Calendar },
     { section: "Operação" },
     { id: "financial", label: "Financeiro", href: "/admin/financial", icon: Wallet },
     { id: "receivables", label: "Cobranças", href: "/admin/receivables", icon: Receipt },
@@ -52,6 +53,7 @@ const NAV: Record<string, NavEntry[]> = {
   ],
   STUDENT: [
     { section: "Aprender" },
+    { id: "lessons", label: "Confirmar aulas", href: "/student/agenda", icon: Calendar },
     { id: "dashboard", label: "Dashboard", href: "/student", icon: LayoutGrid },
     { id: "courses", label: "Cursos", href: "/student/courses", icon: BookOpen },
     { id: "lessons", label: "Aulas", href: "/student/lessons", icon: Calendar },
@@ -132,7 +134,7 @@ export function Sidebar({ previewRole, previewName }: { previewRole?: string; pr
               </div>
             ) : (
               <Link
-                key={item.id}
+                key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className={cx("gw-nav", isActive(pathname, item.href) && "active")}

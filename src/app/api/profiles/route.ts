@@ -13,7 +13,7 @@ const Schema = z.object({
 
 /** GET /api/profiles — lista perfis de acesso (com contagem de usuários). */
 export const GET = withErrorHandler(async () => {
-  await requireAdmin();
+  await requireAdmin("users");
   const profiles = await prisma.accessProfile.findMany({
     orderBy: [{ isSystem: "desc" }, { name: "asc" }],
     include: { _count: { select: { users: true } } },

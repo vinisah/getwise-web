@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import type { ZodError } from "zod";
+import { isUnsafeCrossOriginRequest } from "./request-security";
 
 /** Rótulos PT dos campos de formulário — para a mensagem de erro apontar o campo. */
 const FIELD_LABELS: Record<string, string> = {
@@ -46,10 +47,18 @@ type RouteHandler = (req: NextRequest, ctx?: unknown) => Promise<NextResponse>;
  * - Outros erros → { error: "Erro interno" } com 500 (nunca expõe stack em produção)
  */
 export function withErrorHandler(handler: RouteHandler): RouteHandler {
-  return async (req: NextRequest, ctx?: unknown) => {
+  const privateResponse = (response: NextResponse) => {
+    response.headers.set("Cache-Control", "private, no-store, max-age=0");
+    return response;
+  };
+  const handle: RouteHandler = async (req: NextRequest, ctx?: unknown) => {
     try {
+      if (isUnsafeCrossOriginRequest(req)) throw new ApiError(403, "Origem da requisição não permitida");
       return await handler(req, ctx);
     } catch (err) {
+      if (err instanceof SyntaxError) {
+        return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+      }
       if (err instanceof ApiError) {
         return NextResponse.json({ error: err.message }, { status: err.status });
       }
@@ -73,13 +82,11 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
       if (err instanceof Prisma.PrismaClientValidationError) {
         return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
       }
-      // Falha loud no servidor: loga o erro real
-      console.error("[API ERROR]", req.method, req.nextUrl.pathname, err);
-      const message =
-        process.env.NODE_ENV === "development" && err instanceof Error
-          ? err.message
-          : "Erro interno do servidor";
+      // Erros de drivers podem conter SQL, credenciais ou dados pessoais.
+      console.error("[API ERROR]", req.method, err instanceof Error ? err.name : "UnknownError");
+      const message = "Erro interno do servidor";
       return NextResponse.json({ error: message }, { status: 500 });
     }
   };
+  return async (req, ctx) => privateResponse(await handle(req, ctx));
 }

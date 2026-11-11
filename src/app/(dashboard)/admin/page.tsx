@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCachedSession } from "@/lib/effective-user";
+
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
@@ -22,7 +22,7 @@ const PAY_TONE: Record<string, { label: string; tone: string }> = {
 };
 
 export default async function AdminDashboard() {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
   const now = new Date();

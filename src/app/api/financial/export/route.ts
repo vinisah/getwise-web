@@ -27,7 +27,7 @@ const esc = (v: string) => {
  * Sem month: exporta o ano inteiro. Separador ; e BOM UTF-8 (Excel BR).
  */
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  await requireAdmin();
+  await requireAdmin("financial");
 
   const { searchParams } = new URL(req.url);
   const parsed = MonthYearQuerySchema.safeParse({

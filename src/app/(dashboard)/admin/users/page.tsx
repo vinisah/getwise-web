@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCachedSession } from "@/lib/effective-user";
+
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
@@ -16,7 +16,7 @@ const ROLE_BADGE: Record<string, { label: string; tone: string }> = {
 };
 
 export default async function UsersPage() {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   const me = session?.user as { id?: string; role?: string } | undefined;
   if (me?.role !== "ADMIN") redirect("/login");
 

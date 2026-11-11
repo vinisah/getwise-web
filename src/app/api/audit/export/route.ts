@@ -19,7 +19,7 @@ const esc = (v: string) => {
  * Separador ; e BOM UTF-8 (Excel BR). Mesmo agrupamento de filtros da tela.
  */
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  await requireAdmin();
+  await requireAdmin("audit");
 
   const { searchParams } = new URL(req.url);
   const fk = searchParams.get("filter");

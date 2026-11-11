@@ -13,12 +13,15 @@ export const maxDuration = 30;
 
 // Tutor via Groq (API compatível com OpenAI SDK).
 // timeout < maxDuration p/ o client abortar antes de a função ser cortada pela Vercel.
-const groq = new OpenAI({
+function getGroq() {
+  if (!process.env.GROQ_API_KEY) return null;
+  return new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
   baseURL: "https://api.groq.com/openai/v1",
   timeout: 20_000,
   maxRetries: 1,
 });
+}
 const GROQ_MODEL = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
 
 const SYSTEM_PROMPT = `Você é uma Assistente Profissional de Inglês da escola Get Wise, com experiência equivalente a professores certificados internacionais. Ensine inglês de forma estruturada, prática e eficiente para alunos de qualquer nível (A1 ao C2).
@@ -64,6 +67,10 @@ Keep responses concise and engaging. Use examples, exercises, and real-world con
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const session = await requireAuth();
+  const groq = getGroq();
+  if (!groq) {
+    return NextResponse.json({ error: "Tutor indisponível no momento." }, { status: 503 });
+  }
 
   // Anti-abuso de custo: limita chamadas pagas à Groq por usuário.
   const { allowed, retryAfter } = await checkRateLimit(`ai:${session.user.id}`, LIMITS.AI_CHAT.max, LIMITS.AI_CHAT.windowMs);
@@ -127,7 +134,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     // Falha/timeout do provedor: remove a mensagem do usuário órfã (sem resposta) e
     // responde 503 — não vaza 500 cru nem deixa o histórico inconsistente.
     await prisma.chatMessage.delete({ where: { id: userMsg.id } }).catch(() => {});
-    console.error("[AI] Groq indisponível:", e);
+    console.error("[AI] Groq indisponível:", e instanceof Error ? e.name : "UnknownError");
     return NextResponse.json(
       { error: "Tutor indisponível no momento. Tente novamente em instantes." },
       { status: 503 }

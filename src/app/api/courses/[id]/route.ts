@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 type Ctx = { params: Promise<{ id: string }> };
 
 export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAuth();
+  const session = await requireAuth("courses");
   const { id } = await (ctx as Ctx).params;
 
   const course = await prisma.course.findUnique({
@@ -45,7 +45,7 @@ export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
 });
 
 export const PUT = withErrorHandler(async (req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("courses");
   const { id } = await (ctx as Ctx).params;
 
   const parsed = UpdateCourseSchema.safeParse(await req.json());
@@ -71,7 +71,7 @@ export const PUT = withErrorHandler(async (req: NextRequest, ctx) => {
 });
 
 export const DELETE = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("courses");
   const { id } = await (ctx as Ctx).params;
 
   // Soft-delete (arquivar): preserva histórico do aluno (progresso/tentativas/certificados),

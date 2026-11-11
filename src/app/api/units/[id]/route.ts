@@ -10,7 +10,7 @@ import { ApiError } from "@/lib/api-error";
 type Ctx = { params: Promise<{ id: string }> };
 
 export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAuth();
+  const session = await requireAuth("courses");
   const { id } = await (ctx as Ctx).params;
 
   const unit = await prisma.unit.findUnique({
@@ -49,7 +49,7 @@ export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
 });
 
 export const PUT = withErrorHandler(async (req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("courses");
   const { id } = await (ctx as Ctx).params;
 
   const parsed = UpdateUnitSchema.safeParse(await req.json());
@@ -77,7 +77,7 @@ export const PUT = withErrorHandler(async (req: NextRequest, ctx) => {
 });
 
 export const DELETE = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("courses");
   const { id } = await (ctx as Ctx).params;
 
   await prisma.unit.delete({ where: { id } });

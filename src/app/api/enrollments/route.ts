@@ -10,7 +10,7 @@ import { z } from "zod";
 const StatusFilter = z.enum(["ACTIVE", "SUSPENDED", "CANCELLED", "COMPLETED"]);
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  await requireAdmin();
+  await requireAdmin("enrollments");
 
   const { searchParams } = new URL(req.url);
   const rawStatus = searchParams.get("status");
@@ -38,7 +38,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("enrollments");
 
   const parsed = CreateEnrollmentSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -102,7 +102,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       try {
         await generateChargeForPayment(paymentId);
       } catch (e) {
-        console.error("[billing] falha ao gerar boleto da matrícula", paymentId, e);
+        console.error("[billing] falha ao gerar boleto da matrícula", paymentId, e instanceof Error ? e.name : "UnknownError");
       }
     });
   } catch {

@@ -1,3 +1,4 @@
+import { assignStudent, schedulingTransaction } from "@/lib/scheduling/service";
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { withErrorHandler } from "@/lib/api-error";
@@ -38,7 +39,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const hashed = await bcrypt.hash(password, 10);
 
-  const user = await prisma.user.create({
+  const user = await schedulingTransaction(async (tx) => {
+  const created = await tx.user.create({
     data: {
       name,
       email,
@@ -48,6 +50,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     },
   });
 
+  await assignStudent(created.id, tx);
+  return created;
+  });
   // Token de verificação de e-mail (expira em 24h)
   const token = createToken();
   await prisma.emailVerificationToken.create({
@@ -61,7 +66,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     await sendVerificationEmail(email, token);
   } catch (e) {
     emailSent = false;
-    console.error("[REGISTER] Falha ao enviar e-mail de verificação:", e);
+    console.error("[REGISTER] Falha ao enviar e-mail de verificação:", e instanceof Error ? e.name : "UnknownError");
   }
 
   await audit({ userId: user.id, action: "REGISTER", entity: "User", entityId: user.id, payload: { registered: true, emailSent }, ip });

@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCachedSession } from "@/lib/effective-user";
+
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
@@ -13,7 +13,7 @@ import { Banknote, PiggyBank, Receipt, Wallet, AlertTriangle } from "lucide-reac
 const CONTRACT_LABEL: Record<string, string> = { CLT: "CLT", PJ: "PJ", HOURLY: "Horista" };
 
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string }> }) {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
   const now = new Date();

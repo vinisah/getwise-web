@@ -18,7 +18,9 @@
     "db:studio": "prisma studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "vercel-build": "node scripts/migrate-scheduling.mjs && next build",
+    "db:scheduling": "node scripts/migrate-scheduling.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs,jsx,json,css,md,yml,yaml}": "prettier --write"

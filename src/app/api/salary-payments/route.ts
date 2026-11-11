@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  await requireAdmin();
+  await requireAdmin("payroll");
 
   const { searchParams } = new URL(req.url);
   const parsed = MonthYearQuerySchema.safeParse({
@@ -37,7 +37,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("payroll");
 
   const parsed = CreateSalaryPaymentSchema.safeParse(await req.json());
   if (!parsed.success) {

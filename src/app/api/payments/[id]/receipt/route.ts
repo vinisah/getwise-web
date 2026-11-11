@@ -11,7 +11,7 @@ type Ctx = { params: Promise<{ id: string }> };
  * Acesso: admin ou o próprio aluno dono da mensalidade.
  */
 export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAuth();
+  const session = await requireAuth("receivables");
   const { id } = await (ctx as Ctx).params;
 
   const payment = await prisma.payment.findUnique({

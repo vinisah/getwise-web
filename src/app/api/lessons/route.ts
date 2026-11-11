@@ -11,7 +11,7 @@ import type { Prisma } from "@prisma/client";
 const LessonStatusEnum = z.enum(["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]);
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAuth();
+  const session = await requireAuth("lessons");
 
   const { searchParams } = new URL(req.url);
   const rawStatus = searchParams.get("status");
@@ -26,7 +26,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
   if (session.user.role === "STUDENT") {
     where = {
-      bookings: { some: { studentId: session.user.id } },
+      bookings: { some: { studentId: session.user.id, status: { not: "CANCELLED" } } },
       ...(status ? { status } : {}),
     };
   } else if (session.user.role === "TEACHER") {
@@ -38,13 +38,18 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     where = status ? { status } : {};
   }
 
+  const isStudent = session.user.role === "STUDENT";
   const lessons = await prisma.lesson.findMany({
     where,
+    omit: { notes: isStudent },
     include: {
-      teacher: true,
-      bookings: { include: { student: true } },
+      teacher: { select: { id: true, name: true, image: true } },
+      bookings: {
+        ...(isStudent ? { where: { studentId: session.user.id } } : {}),
+        include: { student: { select: { id: true, name: true } } },
+      },
       materials: true,
-      exercises: true,
+      exercises: { omit: { correctAnswer: isStudent, explanation: isStudent } },
     },
     orderBy: { scheduledAt: "asc" },
   });
@@ -53,7 +58,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAuth();
+  const session = await requireAuth("lessons");
 
   if (session.user.role !== "ADMIN" && session.user.role !== "TEACHER") {
     throw new ApiError(403, "Não autorizado");
@@ -94,7 +99,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
           }
         : undefined,
     },
-    include: { teacher: true, bookings: { include: { student: true } } },
+    include: {
+      teacher: { select: { id: true, name: true, image: true } },
+      bookings: { include: { student: { select: { id: true, name: true } } } },
+    },
   });
 
   await audit({ userId: session.user.id, action: "CREATE_LESSON", entity: "Lesson", entityId: lesson.id });

@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { safeAuditPayload } from "./audit-payload";
 
 export type AuditAction =
   | "LOGIN"
@@ -73,13 +74,13 @@ export async function audit(params: AuditParams): Promise<void> {
         action: params.action,
         entity: params.entity,
         entityId: params.entityId ?? null,
-        payload: params.payload ? (params.payload as import("@prisma/client").Prisma.InputJsonValue) : undefined,
+        payload: params.payload ? safeAuditPayload(params.payload) : undefined,
         ip: params.ip ?? null,
       },
     });
   } catch (err) {
     // Fail loud no log mas não propaga — audit jamais deve derrubar a rota principal
-    console.error("[AUDIT FAIL]", params.action, err);
+    console.error("[AUDIT FAIL]", params.action, err instanceof Error ? err.name : "UnknownError");
   }
 }
 

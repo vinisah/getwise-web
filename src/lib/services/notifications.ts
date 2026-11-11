@@ -25,6 +25,6 @@ export async function createNotification(input: NotifyInput): Promise<void> {
       },
     });
   } catch (e) {
-    console.error("[notification] falha ao criar", input.type, e);
+    console.error("[notification] falha ao criar", input.type, e instanceof Error ? e.name : "UnknownError");
   }
 }

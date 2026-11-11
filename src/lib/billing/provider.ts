@@ -120,7 +120,8 @@ class AsaasBoletoProvider implements BoletoProvider {
     });
     const text = await res.text();
     if (!res.ok) {
-      throw new Error(`Asaas ${res.status} em ${path}: ${text.slice(0, 300)}`);
+      // A URL pode conter CPF; o corpo pode repetir dados de cadastro/credenciais.
+      throw new Error(`Asaas ${res.status}: falha na comunicação com o provedor`);
     }
     return (text ? JSON.parse(text) : {}) as T;
   }

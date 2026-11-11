@@ -8,7 +8,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 /** GET /api/exercises/[id] — detalhe do exercício (sem revelar correctAnswer ao aluno). */
 export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAuth();
+  const session = await requireAuth("courses");
   const { id } = await (ctx as Ctx).params;
 
   const exercise = await prisma.exercise.findUnique({ where: { id } });
@@ -25,7 +25,7 @@ export const GET = withErrorHandler(async (_req: NextRequest, ctx) => {
 
 /** DELETE /api/exercises/[id] — admin remove exercício. */
 export const DELETE = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("courses");
   const { id } = await (ctx as Ctx).params;
 
   // Remove tentativas associadas primeiro (sem cascade no schema)

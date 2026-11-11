@@ -3,7 +3,7 @@ import { reaisToCents } from "./money";
 
 // ─── Reutilizáveis ───────────────────────────────────────────────────────────
 
-const CEFRLevel = z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]);
+const CEFRLevel = z.enum(["A1", "A2", "A3", "B1", "B2", "C1", "C2"]);
 
 const BrazilianPhone = z.string().max(20).optional();
 const CPF = z.string().max(14).optional();

@@ -6,7 +6,7 @@ import { CreateCourseSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 
 export const GET = withErrorHandler(async (_req: NextRequest) => {
-  const session = await requireAuth();
+  const session = await requireAuth("courses");
 
   const courses = await prisma.course.findMany({
     // Aluno só vê cursos ativos; staff vê todos (inclui arquivados p/ gestão).
@@ -22,7 +22,7 @@ export const GET = withErrorHandler(async (_req: NextRequest) => {
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("courses");
 
   const parsed = CreateCourseSchema.safeParse(await req.json());
   if (!parsed.success) {

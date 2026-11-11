@@ -5,7 +5,7 @@ const FROM = process.env.SMTP_FROM ?? "Get Wise <no-reply@getwise.com.br>";
 
 /**
  * Transporte SMTP — só criado se SMTP_HOST estiver configurado.
- * Sem SMTP, cai no modo dev (loga o link no console). Fail loud, funciona sem infra.
+ * Sem SMTP, reporta falha ao chamador. Não simula entrega nem expõe links no console.
  */
 function getTransport() {
   const host = process.env.SMTP_HOST;
@@ -24,21 +24,15 @@ interface MailParams {
   to: string;
   subject: string;
   html: string;
-  /** Link principal — sempre logado em dev para facilitar o teste. */
+  /** Link principal; nunca registrar tokens ou destinatários no console. */
   devLink?: string;
 }
 
-export async function sendMail({ to, subject, html, devLink }: MailParams): Promise<void> {
+export async function sendMail({ to, subject, html }: MailParams): Promise<void> {
   const transport = getTransport();
 
   if (!transport) {
-    // Modo dev: sem SMTP, loga o link no console (fail loud, claro).
-    console.log("\n📧 [EMAIL DEV MODE — SMTP não configurado]");
-    console.log(`   Para: ${to}`);
-    console.log(`   Assunto: ${subject}`);
-    if (devLink) console.log(`   🔗 Link: ${devLink}`);
-    console.log("");
-    return;
+    throw new Error("Serviço de e-mail não configurado");
   }
 
   await transport.sendMail({ from: FROM, to, subject, html });

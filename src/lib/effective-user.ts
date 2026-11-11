@@ -27,6 +27,7 @@ export interface EffectiveUser {
   isPreview: boolean;
   /** id real do admin (para auditoria), quando em preview. */
   realAdminId?: string;
+  profileSections?: string[] | null;
 }
 
 /** Sessão deduplicada por request (React cache) — evita re-checar o JWT no DB várias vezes por página. */
@@ -34,13 +35,13 @@ export const getCachedSession = cache(async () => getServerSession(authOptions))
 
 export const getEffectiveUser = cache(async (): Promise<EffectiveUser | null> => {
   const session = await getCachedSession();
-  const self = session?.user as { id?: string; name?: string; role?: UserRole } | undefined;
+  const self = session?.user;
   if (!self?.id) return null;
 
-  const base: EffectiveUser = { id: self.id, name: self.name ?? "", role: self.role ?? "STUDENT", isPreview: false };
+  const base: EffectiveUser = { id: self.id, name: self.name ?? "", role: self.role ?? "STUDENT", isPreview: false, profileSections: self.profileSections };
 
   // Só ADMIN pode estar em preview.
-  if (self.role !== "ADMIN") return base;
+  if (self.role !== "ADMIN" || self.profileSections != null) return base;
 
   const targetId = (await cookies()).get(PREVIEW_COOKIE)?.value;
   if (!targetId || targetId === self.id) return base;

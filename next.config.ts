@@ -21,6 +21,7 @@ const CSP_REPORT_ONLY = [
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  poweredByHeader: false,
 
   // Libs server-only com binários/recursos nativos → require nativo, fora do bundle do
   // Server Component (reduz o 1º compile das rotas admin/api). @prisma/client, prisma e pg
@@ -34,16 +35,20 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Referrer-Policy", value: "no-referrer" },
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },
-          { key: "X-XSS-Protection", value: "1; mode=block" },
+          { key: "Content-Security-Policy", value: "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'" },
           // HTTPS forçado por 2 anos (browsers ignoram em http/localhost).
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
           { key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY },
         ],
+      },
+      {
+        source: "/api/:path*",
+        headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }],
       },
     ];
   },

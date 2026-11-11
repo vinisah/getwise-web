@@ -14,14 +14,14 @@ type Ctx = { params: Promise<{ id: string }> };
  * Admin pode tudo; professor só a própria aula. Cancelar cascateia os bookings.
  */
 export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
-  const session = await requireAuth();
+  const session = await requireAuth("lessons");
   const { id } = await (ctx as Ctx).params;
 
   if (session.user.role !== "ADMIN" && session.user.role !== "TEACHER") {
     throw new ApiError(403, "Não autorizado");
   }
 
-  const lesson = await prisma.lesson.findUnique({ where: { id }, select: { id: true, teacherId: true, status: true } });
+  const lesson = await prisma.lesson.findUnique({ where: { id }, select: { id: true, teacherId: true, status: true, cohortId: true, level: true } });
   if (!lesson) return NextResponse.json({ error: "Aula não encontrada" }, { status: 404 });
 
   // Professor só edita a própria aula.
@@ -34,6 +34,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
     return NextResponse.json({ error: zodMessage(parsed.error) }, { status: 400 });
   }
   const d = parsed.data;
+  if (lesson.cohortId && d.level && d.level !== lesson.level) throw new ApiError(409, "O nível desta aula precisa corresponder ao nível da turma.");
 
   // Estados terminais (COMPLETED/CANCELLED) são finais: não reabrir. Sem isso, alternar
   // COMPLETED→SCHEDULED→COMPLETED via API crua reprocessaria XP de aula a cada ciclo.
@@ -98,7 +99,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
  * DELETE /api/lessons/[id] — admin remove a aula e suas reservas.
  */
 export const DELETE = withErrorHandler(async (_req: NextRequest, ctx) => {
-  const session = await requireAdmin();
+  const session = await requireAdmin("lessons");
   const { id } = await (ctx as Ctx).params;
 
   const lesson = await prisma.lesson.findUnique({ where: { id }, select: { id: true } });

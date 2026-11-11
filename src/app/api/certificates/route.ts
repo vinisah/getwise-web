@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
  * Admin vê todos.
  */
 export const GET = withErrorHandler(async (_req: NextRequest) => {
-  const session = await requireAuth();
+  const session = await requireAuth("courses");
 
   const where = session.user.role === "ADMIN" ? {} : { userId: session.user.id };
   const certificates = await prisma.certificate.findMany({

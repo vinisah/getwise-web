@@ -5,7 +5,7 @@ import { CreatePlanSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 
 export const GET = withErrorHandler(async (_req: NextRequest) => {
-  await requireAuth();
+  await requireAuth("plans");
 
   const plans = await prisma.plan.findMany({
     where: { isActive: true },
@@ -16,7 +16,7 @@ export const GET = withErrorHandler(async (_req: NextRequest) => {
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  await requireAdmin();
+  await requireAdmin("plans");
 
   const parsed = CreatePlanSchema.safeParse(await req.json());
   if (!parsed.success) {

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 /** GET /api/users — todos os usuários (gestão de acesso). */
 export const GET = withErrorHandler(async (_req: NextRequest) => {
-  await requireAdmin();
+  await requireAdmin("users");
 
   const users = await prisma.user.findMany({
     select: {
