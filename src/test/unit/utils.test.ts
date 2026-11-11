@@ -58,3 +58,10 @@ describe("formatDate", () => {
     expect(result).toMatch(/15/);
   });
 });
+
+describe("formatDateTime", () => {
+  it("shows lesson times in Brasilia even on a UTC server", () => {
+    expect(formatDateTime("2026-11-18T22:00:00Z")).toBe("18/11/2026, 19:00");
+    expect(formatDateTime("2026-11-19T01:30:00Z")).toBe("18/11/2026, 22:30");
+  });
+});

@@ -41,7 +41,7 @@ export default async function AdminDashboard() {
     prisma.financialTransaction.aggregate({ where: { type: "EXPENSE", date: { gte: firstDay, lte: lastDay }, isPaid: true }, _sum: { amount: true } }),
     prisma.lesson.findMany({
       where: { scheduledAt: { gte: now }, status: "SCHEDULED" },
-      include: { teacher: true, bookings: true },
+      include: { teacher: true, bookings: { where: { status: { not: "CANCELLED" } } } },
       orderBy: { scheduledAt: "asc" },
       take: 5,
     }),
