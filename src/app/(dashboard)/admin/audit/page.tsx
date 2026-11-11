@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCachedSession } from "@/lib/effective-user";
+
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
@@ -10,7 +10,7 @@ import { Download } from "lucide-react";
 import { AUDIT_FILTERS as FILTERS } from "@/lib/audit-filters";
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
   const sp = await searchParams;

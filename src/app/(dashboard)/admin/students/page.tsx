@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCachedSession } from "@/lib/effective-user";
+
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
@@ -9,7 +9,7 @@ import { getInitials } from "@/lib/utils";
 import { Search, Plus, ChevronRight } from "lucide-react";
 
 export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ search?: string }> }) {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
   const search = (await searchParams)?.search ?? "";

@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCachedSession } from "@/lib/effective-user";
+
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
@@ -9,7 +9,7 @@ import { Plus, ChevronRight, Layers, BookOpen, Lock } from "lucide-react";
 import { CourseArchiveButton } from "./course-archive-button";
 
 export default async function AdminCoursesPage() {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if ((session?.user as { role?: string })?.role !== "ADMIN") redirect("/login");
 
   const courses = await prisma.course.findMany({
