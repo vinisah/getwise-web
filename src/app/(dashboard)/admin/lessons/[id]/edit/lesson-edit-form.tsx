@@ -12,6 +12,7 @@ import Link from "next/link";
 const levels = [
   { value: "A1", label: "A1 — Iniciante" },
   { value: "A2", label: "A2 — Básico" },
+  { value: "A3", label: "A3 — Conteúdo A3" },
   { value: "B1", label: "B1 — Intermediário" },
   { value: "B2", label: "B2 — Inter. Avançado" },
   { value: "C1", label: "C1 — Avançado" },
