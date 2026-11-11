@@ -55,7 +55,7 @@ describe("segurança e minimização de dados", () => {
     const res = await lessons(new NextRequest("http://localhost/api/lessons"));
     expect(res.status).toBe(200);
     expect(prisma.lesson.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ bookings: { some: { studentId: "student1" } } }),
+      where: expect.objectContaining({ bookings: { some: { studentId: "student1", status: { not: "CANCELLED" } } } }),
       omit: { notes: true },
       include: expect.objectContaining({
         teacher: { select: { id: true, name: true, image: true } },
