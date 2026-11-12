@@ -2,8 +2,15 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TutorMessage } from "@/components/tutor/tutor-message";
 
+let resizeTable: () => void;
+const disconnectTable = vi.fn();
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { resizeTable = callback; }
+    observe() {}
+    disconnect = disconnectTable;
+  });
   vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -15,8 +22,24 @@ describe("Respostas formatadas da Wise", () => {
     expect(container.querySelector("em")).toHaveTextContent("calma");
     expect(container.querySelectorAll("li")).toHaveLength(2);
     expect(screen.getByRole("table")).toHaveTextContent("Morning");
-    expect(screen.getByRole("region", { name: "Tabela da resposta" })).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("region", { name: "Tabela da resposta" })).not.toHaveAttribute("tabindex");
     expect(container.textContent).not.toContain("**");
+  });
+
+  it("keeps an overflowing table focusable and mounted when the reveal finishes", () => {
+    const { unmount } = render(<TutorMessage animate content={"| Palavra | Tradução |\n| --- | --- |\n| Morning | Manhã |"} />);
+    const region = screen.getByRole("region", { name: "Tabela da resposta" });
+    Object.defineProperties(region, { clientWidth: { value: 200, configurable: true }, scrollWidth: { value: 400 } });
+    act(() => resizeTable());
+    expect(region).toHaveAttribute("tabindex", "0");
+    fireEvent.click(screen.getByRole("button", { name: "Mostrar tudo agora" }));
+    expect(screen.getByRole("region", { name: "Tabela da resposta" })).toBe(region);
+    expect(region).toHaveAttribute("tabindex", "0");
+    Object.defineProperty(region, "clientWidth", { value: 500 });
+    act(() => resizeTable());
+    expect(region).not.toHaveAttribute("tabindex");
+    unmount();
+    expect(disconnectTable).toHaveBeenCalled();
   });
 
   it("never executes HTML, loads remote images or creates unsafe links", () => {

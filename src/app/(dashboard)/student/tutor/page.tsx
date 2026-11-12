@@ -8,6 +8,7 @@ import { TutorMessage } from "@/components/tutor/tutor-message";
 import styles from "@/components/tutor/tutor.module.css";
 
 interface Message {
+  id: string;
   role: "user" | "assistant";
   content: string;
   animate?: boolean;
@@ -56,7 +57,7 @@ export default function TutorPage() {
     request.current = controller;
     followMessages.current = true;
     setInput("");
-    setMessages((p) => [...p, { role: "user", content: msg }]);
+    setMessages((p) => [...p, { id: crypto.randomUUID(), role: "user", content: msg }]);
     setLoading(true);
     try {
       const res = await fetch("/api/ai", {
@@ -69,10 +70,10 @@ export default function TutorPage() {
       if (controller.signal.aborted) return;
       if (!res.ok) throw new Error(data.error ?? "Não consegui responder agora. Podemos tentar novamente?");
       if (data.sessionId) setSessionId(data.sessionId);
-      setMessages((p) => [...p, { role: "assistant", content: data.reply ?? "Vamos tentar novamente?", animate: true }]);
+      setMessages((p) => [...p, { id: crypto.randomUUID(), role: "assistant", content: data.reply ?? "Vamos tentar novamente?", animate: true }]);
     } catch (error) {
       if (controller.signal.aborted) return;
-      setMessages((p) => [...p, { role: "assistant", content: error instanceof Error ? error.message : "A conexão oscilou um pouquinho. Vamos tentar novamente?" }]);
+      setMessages((p) => [...p, { id: crypto.randomUUID(), role: "assistant", content: error instanceof Error ? error.message : "A conexão oscilou um pouquinho. Vamos tentar novamente?" }]);
     } finally {
       if (request.current === controller) { request.current = null; setLoading(false); }
     }
@@ -111,25 +112,25 @@ export default function TutorPage() {
             </div>
             <div className={styles.suggestions}>
               {SUGGESTIONS.map((s, index) => (
-                <button key={s.title} className={styles.suggestion} style={{ animationDelay: `${600 + index * 180}ms` }} onClick={() => send(s.prompt)}><strong>{s.title}</strong><span>{s.description}</span></button>
+                <button key={s.title} className={styles.suggestion} style={{ animationDelay: `${600 + index * 180}ms` }} onClick={() => { void send(s.prompt); }}><strong>{s.title}</strong><span>{s.description}</span></button>
               ))}
             </div>
           </div>
         ) : (
           <div className={styles.conversation} aria-live="polite" aria-relevant="additions">
             {messages.map((m, i) => (
-              <div key={i} ref={i === messages.length - 1 ? lastMessage : undefined} className={`${styles.row} ${m.role === "user" ? styles.userRow : ""}`}>
+              <div key={m.id} ref={i === messages.length - 1 ? lastMessage : undefined} className={`${styles.row} ${m.role === "user" ? styles.userRow : ""}`}>
                 {m.role === "user" ? <Avatar initials="EU" size={34} tone="brand" /> : <BotAvatar />}
-                <div className={`gw-bubble ${styles.bubble} ${m.role === "user" ? `user ${styles.userBubble}` : "bot"}`}>{m.role === "assistant" ? <TutorMessage content={m.content} animate={m.animate} /> : m.content}</div>
+                <div className={["gw-bubble", styles.bubble, m.role === "user" ? "user" : "bot", m.role === "user" ? styles.userBubble : ""].join(" ")}>{m.role === "assistant" ? <TutorMessage content={m.content} animate={m.animate} /> : m.content}</div>
               </div>
             ))}
             {loading && (
-              <div className={styles.row} role="status">
+              <div className={styles.row}>
                 <BotAvatar />
-                <div className={`gw-bubble bot ${styles.thinking}`}>
+                <output className={`gw-bubble bot ${styles.thinking}`}>
                   <span className="gw-typing" /><span className="gw-typing" /><span className="gw-typing" />
                   <span className={styles.thinkingText}>Preparando sua resposta com cuidado…</span>
-                </div>
+                </output>
               </div>
             )}
           </div>
@@ -138,7 +139,7 @@ export default function TutorPage() {
 
       {/* composer */}
       <div className="gw-chat-foot">
-        <form onSubmit={(e) => { e.preventDefault(); send(); }} className={`gw-composer ${styles.composer}`}>
+        <form onSubmit={(e) => { e.preventDefault(); void send(); }} className={`gw-composer ${styles.composer}`}>
           <input aria-label="Sua mensagem para a Wise" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Escreva em inglês ou português…" maxLength={2000} />
           <Button aria-label="Enviar mensagem" type="submit" variant="accent" disabled={!input.trim() || loading} style={{ padding: "10px 14px" }}>
             <Send size={18} />

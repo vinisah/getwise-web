@@ -1,7 +1,7 @@
 "use client";
 
-import { memo, useEffect, useState } from "react";
-import Markdown from "react-markdown";
+import { memo, useEffect, useRef, useState, type PropsWithChildren } from "react";
+import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Root, Element, ElementContent, Text } from "hast";
 import styles from "./tutor.module.css";
@@ -39,6 +39,29 @@ function revealWords() {
 const plugins = [revealWords];
 const gfm = [remarkGfm];
 
+function TutorTable({ children }: PropsWithChildren) {
+  const region = useRef<HTMLElement>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const element = region.current;
+    if (!element) return;
+    const measure = () => setOverflows(element.scrollWidth > element.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    if (element.firstElementChild) observer.observe(element.firstElementChild);
+    return () => observer.disconnect();
+  }, []);
+  // Only overflowing tables enter the tab order, so arrow keys can scroll them.
+  return <section ref={region} className={styles.tableScroll} aria-label="Tabela da resposta" tabIndex={overflows ? 0 : undefined}><table>{children}</table></section>;
+}
+
+const components: Components = {
+  a: ({ href, children }) => /^https?:\/\//i.test(href ?? "") ? <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> : <span>{children}</span>,
+  img: () => null,
+  table: TutorTable,
+};
+
 export const TutorMessage = memo(function TutorMessage({ content, animate = false }: { content: string; animate?: boolean }) {
   const [complete, setComplete] = useState(!animate);
   const duration = Math.min(9000, (content.match(/\S+/gu)?.length ?? 0) * 65) + 400;
@@ -57,11 +80,7 @@ export const TutorMessage = memo(function TutorMessage({ content, animate = fals
   return (
     <div className={`${styles.message} ${!complete ? styles.revealing : ""}`}>
       {animate && <div className={styles.revealControls}>{!complete && <button type="button" className={styles.revealButton} onClick={() => setComplete(true)}>Mostrar tudo agora</button>}</div>}
-      <Markdown remarkPlugins={gfm} rehypePlugins={plugins} skipHtml components={{
-        a: ({ href, children }) => /^https?:\/\//i.test(href ?? "") ? <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> : <span>{children}</span>,
-        img: () => null,
-        table: ({ children }) => <div className={styles.tableScroll} role="region" aria-label="Tabela da resposta" tabIndex={0}><table>{children}</table></div>,
-      }}>{content}</Markdown>
+      <Markdown remarkPlugins={gfm} rehypePlugins={plugins} skipHtml components={components}>{content}</Markdown>
     </div>
   );
 });
