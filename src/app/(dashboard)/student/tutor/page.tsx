@@ -4,17 +4,21 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/gw/primitives";
 import { Bot, Send, Plus } from "lucide-react";
+import { TutorMessage } from "@/components/tutor/tutor-message";
+import styles from "@/components/tutor/tutor.module.css";
 
 interface Message {
+  id: string;
   role: "user" | "assistant";
   content: string;
+  animate?: boolean;
 }
 
 const SUGGESTIONS = [
-  "Can you help me practice my daily routine?",
-  "What's the difference between 'since' and 'for'?",
-  "Help me with the present perfect tense",
-  "Let's have a conversation about traveling",
+  { title: "Conversar sem pressa", description: "Um diálogo leve, no seu nível.", prompt: "Let's have a calm, simple conversation about my daily routine. Ask me one question at a time." },
+  { title: "Entender a gramática", description: "Explicações simples, com exemplos.", prompt: "Can you explain the difference between since and for with a simple example?" },
+  { title: "Cuidar da minha escrita", description: "Correções gentis para ganhar confiança.", prompt: "Help me practice writing in English. Give me a short prompt and gently correct my answer." },
+  { title: "Descobrir novas palavras", description: "Vocabulário para usar na vida real.", prompt: "Teach me three useful English words for traveling, with pronunciation and examples." },
 ];
 
 function BotAvatar() {
@@ -31,86 +35,102 @@ export default function TutorPage() {
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastMessage = useRef<HTMLDivElement>(null);
+  const followMessages = useRef(true);
+  const request = useRef<AbortController | null>(null);
+
+  useEffect(() => () => request.current?.abort(), []);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const container = scrollRef.current;
+    if (!container || !followMessages.current) return;
+    if (messages.length === 0) { container.scrollTop = 0; return; }
+    if (lastMessage.current) {
+      container.scrollTop += lastMessage.current.getBoundingClientRect().top - container.getBoundingClientRect().top - 12;
+    } else container.scrollTop = container.scrollHeight;
   }, [messages, loading]);
 
   async function send(text?: string) {
     const msg = (text ?? input).trim();
-    if (!msg || loading) return;
+    if (!msg || request.current) return;
+    const controller = new AbortController();
+    request.current = controller;
+    followMessages.current = true;
     setInput("");
-    setMessages((p) => [...p, { role: "user", content: msg }]);
+    setMessages((p) => [...p, { id: crypto.randomUUID(), role: "user", content: msg }]);
     setLoading(true);
     try {
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: msg, sessionId }),
+        signal: controller.signal,
       });
       const data = await res.json();
+      if (controller.signal.aborted) return;
+      if (!res.ok) throw new Error(data.error ?? "Não consegui responder agora. Podemos tentar novamente?");
       if (data.sessionId) setSessionId(data.sessionId);
-      setMessages((p) => [...p, { role: "assistant", content: data.reply ?? "Sorry, something went wrong." }]);
-    } catch {
-      setMessages((p) => [...p, { role: "assistant", content: "Oops! Connection hiccup. Let's try again 🙂" }]);
+      setMessages((p) => [...p, { id: crypto.randomUUID(), role: "assistant", content: data.reply ?? "Vamos tentar novamente?", animate: true }]);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setMessages((p) => [...p, { id: crypto.randomUUID(), role: "assistant", content: error instanceof Error ? error.message : "A conexão oscilou um pouquinho. Vamos tentar novamente?" }]);
     } finally {
-      setLoading(false);
+      if (request.current === controller) { request.current = null; setLoading(false); }
     }
   }
 
   const empty = messages.length === 0;
 
   return (
-    <div className="gw-card" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 168px)", overflow: "hidden" }}>
+    <div className={`gw-card ${styles.shell}`}>
       {/* header */}
-      <div className="gw-chat-head">
+      <div className={`gw-chat-head ${styles.header}`}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 42, height: 42, borderRadius: "var(--r-sm)", background: "var(--violet-soft)", color: "var(--violet)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Bot size={22} />
           </div>
           <div>
             <div style={{ fontSize: 14.5, fontWeight: 700, color: "var(--ink)" }}>Wise Tutor</div>
-            <div style={{ fontSize: 12, color: "var(--success)", fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--success)" }} /> Online · responde na hora
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>
+              No seu ritmo, uma conversa de cada vez
             </div>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => { setMessages([]); setInput(""); setSessionId(null); }}>
+        <Button variant="outline" size="sm" onClick={() => { request.current?.abort(); request.current = null; setLoading(false); setMessages([]); setInput(""); setSessionId(null); followMessages.current = true; }}>
           <Plus size={15} /> Nova conversa
         </Button>
       </div>
 
       {/* messages */}
-      <div ref={scrollRef} className="gw-chat-body">
+      <div ref={scrollRef} className={`gw-chat-body ${styles.body}`} onScroll={(e) => { const el = e.currentTarget; followMessages.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120; }}>
         {empty ? (
-          <div style={{ margin: "auto", textAlign: "center", maxWidth: 460, padding: "20px 0" }}>
-            <div style={{ width: 72, height: 72, borderRadius: 22, background: "var(--violet-soft)", color: "var(--violet)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
-              <Bot size={36} />
+          <div className={styles.welcome}>
+            <div className={styles.eyebrow}>Um espaço para aprender com calma</div>
+            <h1>Olá, eu sou a Wise.<br />Vamos aprender no seu ritmo?</h1>
+            <div className={styles.intro}>
+              <TutorMessage animate content={"Estou aqui para ajudar você a se sentir **mais confiante no inglês**, um passo de cada vez. Podemos conversar, explorar a gramática, descobrir palavras ou cuidar da sua escrita.\n\nNão precisa acertar tudo. **Vamos praticar juntos, com calma.**"} />
             </div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--ink)", letterSpacing: "-.02em" }}>Your English Tutor is ready!</h2>
-            <p style={{ fontSize: 13.5, color: "var(--muted)", marginTop: 8 }}>
-              Ask anything — grammar, vocabulary, pronunciation — or just start a conversation in English.
-            </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 22 }}>
-              {SUGGESTIONS.map((s) => (
-                <button key={s} className="gw-chip" onClick={() => send(s)}>{s}</button>
+            <div className={styles.suggestions}>
+              {SUGGESTIONS.map((s, index) => (
+                <button key={s.title} className={styles.suggestion} style={{ animationDelay: `${600 + index * 180}ms` }} onClick={() => { void send(s.prompt); }}><strong>{s.title}</strong><span>{s.description}</span></button>
               ))}
             </div>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 760, margin: "0 auto", width: "100%" }}>
+          <div className={styles.conversation} aria-live="polite" aria-relevant="additions">
             {messages.map((m, i) => (
-              <div key={i} style={{ display: "flex", gap: 11, flexDirection: m.role === "user" ? "row-reverse" : "row" }}>
+              <div key={m.id} ref={i === messages.length - 1 ? lastMessage : undefined} className={`${styles.row} ${m.role === "user" ? styles.userRow : ""}`}>
                 {m.role === "user" ? <Avatar initials="EU" size={34} tone="brand" /> : <BotAvatar />}
-                <div className={`gw-bubble ${m.role === "user" ? "user" : "bot"}`}>{m.content}</div>
+                <div className={["gw-bubble", styles.bubble, m.role === "user" ? "user" : "bot", m.role === "user" ? styles.userBubble : ""].join(" ")}>{m.role === "assistant" ? <TutorMessage content={m.content} animate={m.animate} /> : m.content}</div>
               </div>
             ))}
             {loading && (
-              <div style={{ display: "flex", gap: 11 }}>
+              <div className={styles.row}>
                 <BotAvatar />
-                <div className="gw-bubble bot" style={{ display: "flex", gap: 5 }}>
+                <output className={`gw-bubble bot ${styles.thinking}`}>
                   <span className="gw-typing" /><span className="gw-typing" /><span className="gw-typing" />
-                </div>
+                  <span className={styles.thinkingText}>Preparando sua resposta com cuidado…</span>
+                </output>
               </div>
             )}
           </div>
@@ -119,9 +139,9 @@ export default function TutorPage() {
 
       {/* composer */}
       <div className="gw-chat-foot">
-        <form onSubmit={(e) => { e.preventDefault(); send(); }} className="gw-composer">
-          <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Type your message in English..." autoFocus />
-          <Button type="submit" variant="accent" disabled={!input.trim() || loading} style={{ padding: "10px 14px" }}>
+        <form onSubmit={(e) => { e.preventDefault(); void send(); }} className={`gw-composer ${styles.composer}`}>
+          <input aria-label="Sua mensagem para a Wise" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Escreva em inglês ou português…" maxLength={2000} />
+          <Button aria-label="Enviar mensagem" type="submit" variant="accent" disabled={!input.trim() || loading} style={{ padding: "10px 14px" }}>
             <Send size={18} />
           </Button>
         </form>
