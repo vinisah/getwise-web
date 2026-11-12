@@ -32,7 +32,7 @@ export default async function LessonsPage({ searchParams }: { searchParams: Prom
   const statusFilter = (await searchParams)?.status;
   const lessons = await prisma.lesson.findMany({
     where: statusFilter ? { status: statusFilter as never } : {},
-    include: { teacher: true, bookings: { include: { student: true } } },
+    include: { teacher: true, bookings: { where: { status: { not: "CANCELLED" } }, include: { student: true } } },
     orderBy: { scheduledAt: "desc" },
   });
 

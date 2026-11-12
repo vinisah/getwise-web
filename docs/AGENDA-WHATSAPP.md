@@ -14,6 +14,8 @@ A cópia de trabalho está em Documents/ChatGPT/Sistema Get Wise/student-feature
 
 ## Como usar
 
+Revisão retomada em 12/11/2026 na PR #3: horários dos painéis e listas usam explicitamente America/Sao_Paulo. Tanto o painel administrativo quanto a lista de aulas excluem reservas canceladas da ocupação. Testes de regressão verificam a conversão de UTC na virada do dia e a exibição de uma vaga ocupada quando há uma reserva ativa e outra cancelada.
+
 A equipe acessa Aulas → Turmas e agenda para criar encontros semanais A1, A2 ou A3, indicar o mentor e definir vagas. O cadastro de alunos nesses níveis requer uma turma com vagas e gera as reservas futuras na mesma transação. Alunos anteriores podem ser alocados pela lista de turmas.
 
 O aluno abre Confirmar aulas para confirmar, justificar ausência, escolher outro encontro e reservar aulas adicionais do mesmo nível. A remarcação preserva a turma fixa, respeita o período do curso e impede sobreposição de horários. O professor encontra a lista atualizada em Minhas aulas. A confirmação de intenção é independente da chamada de presença.
