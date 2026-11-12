@@ -8,6 +8,7 @@ import { Card, SectionHeader, MiniStat } from "@/components/gw/primitives";
 import { Button } from "@/components/ui/button";
 import { formatDateTime, safeHttpUrl } from "@/lib/utils";
 import { Calendar, Star, Headphones, ClipboardCheck } from "lucide-react";
+import { AgendaRefresh } from "@/components/scheduling/agenda-refresh";
 
 /** Mesmo dia-calendário no fuso Brasília. */
 function sameDayBR(a: Date, b: Date): boolean {
@@ -26,7 +27,12 @@ export default async function TeacherDashboard() {
   const [lessons, classFreq, rating] = await Promise.all([
     prisma.lesson.findMany({
       where: { teacherId: user.id },
-      include: { bookings: { where: { status: { not: "CANCELLED" } }, include: { student: { select: { id: true, name: true } } } } },
+      include: {
+        bookings: {
+          where: { status: { not: "CANCELLED" } },
+          include: { student: { select: { id: true, name: true } } },
+        },
+      },
       orderBy: { scheduledAt: "asc" },
     }),
     teacherClassFrequency(user.id),
@@ -110,6 +116,7 @@ export default async function TeacherDashboard() {
         </div>
       </div>
 
+      <AgendaRefresh />
       {/* KPIs */}
       <div className="gw-stats-grid">
         <MiniStat label="Aulas hoje" value={String(todayLessons.length)} tone="blue" />

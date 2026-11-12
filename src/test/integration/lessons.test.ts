@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { PATCH as lessonPATCH, DELETE as lessonDELETE } from "@/app/api/lessons/[id]/route";
+import { POST as lessonPOST } from "@/app/api/lessons/route";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 
 const mockSession = vi.mocked(getServerSession);
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 const admin = { user: { id: "a1", role: "ADMIN" as const, name: "A", email: "a@a.com" } };
 const teacher = (id: string) => ({ user: { id, role: "TEACHER" as const, name: "T", email: "t@t.com" } });
@@ -108,5 +109,70 @@ describe("DELETE /api/lessons/[id]", () => {
     mockSession.mockResolvedValueOnce(teacher("t1") as any);
     const res = await lessonDELETE(delReq(), ctx as any);
     expect(res.status).toBe(403);
+  });
+});
+
+describe("Criação e alteração manual respeitam a realocação", () => {
+  const scheduledAt = new Date("2036-02-02T22:00:00Z");
+  const current = { id: "L1", teacherId: "t1", status: "SCHEDULED", level: "A1", scheduledAt, duration: 50 };
+  const create = {
+    title: "Conversação",
+    teacherId: "t1",
+    scheduledAt: "2036-02-02T19:00",
+    level: "A1",
+    maxStudents: 2,
+  };
+  beforeEach(() => {
+    mockSession.mockResolvedValue(admin as any);
+    mockPrisma.user.findFirst.mockResolvedValue({ id: "t1" } as never);
+    mockPrisma.lesson.findMany.mockResolvedValue([]);
+    mockPrisma.lessonBooking.findMany.mockResolvedValue([]);
+    mockPrisma.lesson.findUnique.mockResolvedValue(current as never);
+    mockPrisma.lesson.update.mockResolvedValue(current as never);
+  });
+
+  it("recusa aula nova com alunos além da capacidade", async () => {
+    const response = await lessonPOST(req({ ...create, maxStudents: 1, studentIds: ["s1", "s2"] }));
+    expect(response.status).toBe(409);
+    expect(mockPrisma.lesson.create).not.toHaveBeenCalled();
+  });
+
+  it("recusa colisão do professor na criação", async () => {
+    mockPrisma.lesson.findMany.mockResolvedValueOnce([{ ...current, id: "other" }] as never);
+    const response = await lessonPOST(req(create));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toContain("professor");
+    expect(mockPrisma.lesson.create).not.toHaveBeenCalled();
+  });
+
+  it("recusa aluno de outro nível na criação", async () => {
+    mockPrisma.user.count.mockResolvedValueOnce(0);
+    const response = await lessonPOST(req({ ...create, studentIds: ["s1"] }));
+    expect(response.status).toBe(400);
+    expect(mockPrisma.lesson.create).not.toHaveBeenCalled();
+  });
+
+  it("recusa conflito de um participante ao mover a aula", async () => {
+    mockPrisma.lessonBooking.findMany
+      .mockResolvedValueOnce([{ studentId: "s1" }] as never)
+      .mockResolvedValueOnce([
+        { lessonId: "other", lesson: { ...current, scheduledAt: new Date("2036-02-03T22:20:00Z") } },
+      ] as never);
+    const response = await lessonPATCH(req({ scheduledAt: "2036-02-03T19:00" }), ctx);
+    expect(response.status).toBe(409);
+    expect(mockPrisma.lesson.update).not.toHaveBeenCalled();
+  });
+
+  it("mudar o horário usa Brasília e exige nova confirmação dos participantes", async () => {
+    const response = await lessonPATCH(req({ scheduledAt: "2036-02-03T19:00" }), ctx);
+    expect(response.status).toBe(200);
+    expect(mockPrisma.lesson.update).toHaveBeenCalledWith({
+      where: { id: "L1" },
+      data: { scheduledAt: new Date("2036-02-03T22:00:00Z") },
+    });
+    expect(mockPrisma.lessonBooking.updateMany).toHaveBeenCalledWith({
+      where: { lessonId: "L1", status: { not: "CANCELLED" } },
+      data: { confirmation: "PENDING", reminderSentAt: null },
+    });
   });
 });

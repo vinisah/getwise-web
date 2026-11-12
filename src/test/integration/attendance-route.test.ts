@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 
 const mockSession = vi.mocked(getServerSession);
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 const admin = { user: { id: "a1", role: "ADMIN" as const, name: "A", email: "a@a.com" } };
 const teacher = (id: string) => ({ user: { id, role: "TEACHER" as const, name: "T", email: "t@t.com" } });
@@ -72,7 +72,14 @@ describe("POST /api/lessons/[id]/attendance", () => {
     (mockPrisma.lesson.findUnique as any).mockResolvedValueOnce({ id: "L1", teacherId: "t1" });
     await attendancePOST(req(validBody), ctx as any);
     expect(mockPrisma.lessonBooking.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { lessonId: "L1", studentId: "s1" } })
+      expect.objectContaining({ where: { lessonId: "L1", studentId: "s1", status: { not: "CANCELLED" } } })
     );
+  });
+  it("reserva que saiu da turma não recebe presença de formulário antigo", async () => {
+    mockSession.mockResolvedValueOnce(admin as any);
+    mockPrisma.lesson.findUnique.mockResolvedValueOnce({ id: "L1", teacherId: "t1", status: "SCHEDULED" } as never);
+    mockPrisma.lessonBooking.updateMany.mockResolvedValueOnce({ count: 0 });
+    expect((await attendancePOST(req(validBody), ctx)).status).toBe(409);
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
   });
 });
