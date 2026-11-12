@@ -64,6 +64,7 @@ vi.mock("@/lib/prisma", () => ({
     auditLog: { create: vi.fn() },
     $transaction: vi.fn(),
     $executeRaw: vi.fn(),
+    $executeRawUnsafe: vi.fn(),
     course: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     module: { findMany: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     unit: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },

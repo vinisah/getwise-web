@@ -7,6 +7,7 @@ import { createNotification } from "@/lib/services/notifications";
 import { CreateLessonSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { schedulingTransaction, assertTeacherSlot, assertStudentSlot } from "@/lib/scheduling/service";
 
 const LessonStatusEnum = z.enum(["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]);
 
@@ -75,34 +76,47 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // TEACHER só cria aula em seu próprio nome; ADMIN pode designar outro professor.
   const finalTeacherId = session.user.role === "ADMIN" ? (teacherId ?? session.user.id) : session.user.id;
 
-  // Valida que todos os studentIds são alunos existentes (evita IDOR/lixo).
-  if (studentIds?.length) {
-    const validCount = await prisma.user.count({ where: { id: { in: studentIds }, role: "STUDENT" } });
-    if (validCount !== studentIds.length) {
-      throw new ApiError(400, "Um ou mais alunos são inválidos");
-    }
-  }
+  const lesson = await schedulingTransaction(async (tx) => {
+    if (new Date(scheduledAt) <= new Date()) throw new ApiError(400, "Escolha uma data futura");
+    if (new Set(studentIds).size !== (studentIds?.length ?? 0))
+      throw new ApiError(400, "Há alunos repetidos na seleção");
+    if ((studentIds?.length ?? 0) > (maxStudents ?? 1))
+      throw new ApiError(409, "A quantidade de alunos excede a capacidade da aula");
+    const slot = { scheduledAt: new Date(scheduledAt), duration: duration ?? 50 };
+    await assertTeacherSlot(tx, finalTeacherId, slot);
 
-  const lesson = await prisma.lesson.create({
-    data: {
-      teacherId: finalTeacherId,
-      title,
-      description: description || null,
-      scheduledAt: new Date(scheduledAt),
-      duration: duration ?? 50,
-      meetingUrl: meetingUrl || null,
-      level,
-      maxStudents: maxStudents ?? 1,
-      bookings: studentIds?.length
-        ? {
-            create: (studentIds as string[]).map((sid) => ({ studentId: sid })),
-          }
-        : undefined,
-    },
-    include: {
-      teacher: { select: { id: true, name: true, image: true } },
-      bookings: { include: { student: { select: { id: true, name: true } } } },
-    },
+    // Valida os alunos e todos os horários sob o mesmo lock da realocação.
+    if (studentIds?.length) {
+      const validCount = await tx.user.count({
+        where: { id: { in: studentIds }, role: "STUDENT", isActive: true, studentProfile: { level } },
+      });
+      if (validCount !== studentIds.length) {
+        throw new ApiError(400, "Selecione alunos ativos do mesmo nível da aula");
+      }
+      for (const studentId of studentIds) await assertStudentSlot(tx, studentId, slot);
+    }
+
+    return tx.lesson.create({
+      data: {
+        teacherId: finalTeacherId,
+        title,
+        description: description || null,
+        scheduledAt: new Date(scheduledAt),
+        duration: duration ?? 50,
+        meetingUrl: meetingUrl || null,
+        level,
+        maxStudents: maxStudents ?? 1,
+        bookings: studentIds?.length
+          ? {
+              create: (studentIds as string[]).map((sid) => ({ studentId: sid })),
+            }
+          : undefined,
+      },
+      include: {
+        teacher: { select: { id: true, name: true, image: true } },
+        bookings: { include: { student: { select: { id: true, name: true } } } },
+      },
+    });
   });
 
   await audit({ userId: session.user.id, action: "CREATE_LESSON", entity: "Lesson", entityId: lesson.id });

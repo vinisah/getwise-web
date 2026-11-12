@@ -5,10 +5,11 @@ import { requireEffectiveStudent, PREVIEW_COOKIE } from "@/lib/effective-user";
 import { prisma } from "@/lib/prisma";
 import { CohortInput, ResponseInput } from "@/lib/scheduling/rules";
 import { assignStudent, createCohort, respond, bookAdditionalLesson } from "@/lib/scheduling/service";
+import { overlaps } from "@/lib/scheduling/rules";
 
 export const GET = withErrorHandler(async (req) => {
   if (req.nextUrl.searchParams.get("admin") === "true") {
-    await requireAdmin("lessons");
+    const session = await requireAdmin("lessons");
     const [cohorts, students, teachers] = await Promise.all([
       prisma.cohort.findMany({
         include: { _count: { select: { students: true, lessons: true } } },
@@ -21,12 +22,19 @@ export const GET = withErrorHandler(async (req) => {
       }),
       prisma.user.findMany({ where: { role: "TEACHER", isActive: true }, select: { id: true, name: true } }),
     ]);
-    return NextResponse.json({ cohorts, students, teachers });
+    const sections = session.user.profileSections;
+    return NextResponse.json({
+      cohorts,
+      students,
+      teachers,
+      canAssign: sections == null || sections.includes("students"),
+      canPreview: sections == null,
+    });
   }
   const user = await requireEffectiveStudent();
   const profile = await prisma.studentProfile.findUnique({ where: { userId: user.id }, include: { cohort: true } });
   const bookings = await prisma.lessonBooking.findMany({
-    where: { studentId: user.id, lesson: { scheduledAt: { gt: new Date() } } },
+    where: { studentId: user.id, lesson: { scheduledAt: { gt: new Date(Date.now() - 180 * 60000) } } },
     include: { lesson: { include: { teacher: { select: { name: true } } } } },
     orderBy: { lesson: { scheduledAt: "asc" } },
   });
@@ -40,6 +48,7 @@ export const GET = withErrorHandler(async (req) => {
             cohortId: { not: null },
             level: profile.level,
             status: "SCHEDULED",
+            teacher: { isActive: true, role: "TEACHER" },
             scheduledAt: { gt: new Date(), lte: courseEnd.scheduledAt },
           },
           include: {
@@ -51,16 +60,13 @@ export const GET = withErrorHandler(async (req) => {
       : [];
   return NextResponse.json({
     profile,
-    bookings,
+    bookings: bookings.filter((b) => b.lesson.scheduledAt > new Date() || b.lesson.status === "IN_PROGRESS"),
     available: available.filter(
       (l) =>
         l._count.bookings < l.maxStudents &&
         !bookings.some(
           (b) =>
-            b.status !== "CANCELLED" &&
-            b.lesson.status === "SCHEDULED" &&
-            b.lesson.scheduledAt.getTime() < l.scheduledAt.getTime() + l.duration * 60000 &&
-            b.lesson.scheduledAt.getTime() + b.lesson.duration * 60000 > l.scheduledAt.getTime()
+            b.status !== "CANCELLED" && ["SCHEDULED", "IN_PROGRESS"].includes(b.lesson.status) && overlaps(b.lesson, l)
         )
     ),
   });
@@ -68,6 +74,7 @@ export const GET = withErrorHandler(async (req) => {
 
 export const POST = withErrorHandler(async (req) => {
   const body = await req.json();
+  if (!body || typeof body !== "object" || Array.isArray(body)) throw new ApiError(400, "Informe uma ação válida");
   if (body.action === "createCohort") {
     await requireAdmin("lessons");
     const input = CohortInput.safeParse(body);
