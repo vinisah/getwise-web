@@ -14,6 +14,14 @@ A cópia de trabalho está em Documents/ChatGPT/Sistema Get Wise/student-feature
 
 ## Como usar
 
+### Acesso local pelo Windows
+
+Abra `iniciar-get-wise.bat` na pasta do projeto (ou o atalho `.bat` na pasta `Documents/ChatGPT/Sistema Get Wise`). O iniciador abre Turmas e agenda no Google Chrome, inicia o PostgreSQL existente se necessario e reutiliza o servidor da porta 3001 quando ele ja esta disponivel. O `.bat` da pasta original tambem encaminha para esta versao.
+
+Quando nao ha servidor rodando, ele recompila se os arquivos forem mais novos que o build. Logs ficam na pasta GetWise do runtime, em `%LOCALAPPDATA%` ou na pasta virtualizada do Codex em `AppData/Local/Packages/OpenAI.Codex_2p2nqsd0c76g0/LocalCache/Local`. O banco continua sendo `getwise_feature`, em `127.0.0.1:55432`. O iniciador recusa configuracao de banco remoto, nao cria um banco substituto e nao encerra processos que ocupam a porta.
+
+Para verificar sem abrir uma nova aba: `iniciar-get-wise.bat -NoBrowser`. Preferencia de navegacao do projeto: Google Chrome para avaliar design e responsividade.
+
 Revisão retomada em 12/11/2026 na PR #3: horários dos painéis e listas usam explicitamente America/Sao_Paulo. Tanto o painel administrativo quanto a lista de aulas excluem reservas canceladas da ocupação. Testes de regressão verificam a conversão de UTC na virada do dia e a exibição de uma vaga ocupada quando há uma reserva ativa e outra cancelada.
 
 A equipe acessa Aulas → Turmas e agenda para criar encontros semanais A1, A2 ou A3, indicar o mentor e definir vagas. O cadastro de alunos nesses níveis requer uma turma com vagas e gera as reservas futuras na mesma transação. Alunos anteriores podem ser alocados pela lista de turmas.
