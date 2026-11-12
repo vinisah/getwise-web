@@ -1,5 +1,29 @@
 # Turmas, agenda e WhatsApp
 
+## Relatório da entrega — 10/11/2026
+
+Publicado em https://getwise-web.vercel.app, com código integrado no GitHub pela PR #2. Inclui as alterações de segurança autorizadas, agenda responsiva, alocação por nível, remarcação com limite de vagas e otimizações de consultas de sessão e feedback durante navegação.
+
+A validação incluiu 355 testes automatizados aprovados na entrega inicial, teste adicional com PostgreSQL real para disputa pela última vaga, build e CI do GitHub. Em produção, uma ausência foi justificada e remarcada, mantendo a turma fixa e confirmando a nova reserva. A revisão também padronizou os horários das telas antigas para Brasília e excluiu reservas canceladas da contagem do painel administrativo.
+
+Foram criadas duas turmas A1 com nomes DEMONSTRAÇÃO, quatro encontros semanais cada, iniciando em 18 e 20 de novembro às 19h. O Aluno de Demonstração não possui telefone nem autorização para mensagens. Acesse Turmas e agenda → Ver agenda do aluno para experimentar.
+
+Pendências: ativar a conta, número e template Meta; validar o envio e recebimento reais; ampliar os lotes de lembretes se houver mais de 50 confirmações por dia e conciliar falhas de envio incertas. O WhatsApp usa comandos estruturados, descritos abaixo. O login continua no modo demonstração existente, sem senha e com acesso administrativo; autenticação individual deve ser ativada antes do uso com dados reais. As melhorias de navegação foram entregues sem uma medição comparativa de latência.
+
+A cópia de trabalho está em Documents/ChatGPT/Sistema Get Wise/student-feature, com banco local separado getwise_feature e porta 3001. A pasta original foi preservada.
+
+## Como usar
+
+### Acesso local pelo Windows
+
+Abra `iniciar-get-wise.bat` na pasta do projeto (ou o atalho `.bat` na pasta `Documents/ChatGPT/Sistema Get Wise`). O iniciador abre Turmas e agenda no Google Chrome, inicia o PostgreSQL existente se necessario e reutiliza o servidor da porta 3001 quando ele ja esta disponivel. O `.bat` da pasta original tambem encaminha para esta versao.
+
+Quando nao ha servidor rodando, ele recompila se os arquivos forem mais novos que o build. Logs ficam na pasta GetWise do runtime, em `%LOCALAPPDATA%` ou na pasta virtualizada do Codex em `AppData/Local/Packages/OpenAI.Codex_2p2nqsd0c76g0/LocalCache/Local`. O banco continua sendo `getwise_feature`, em `127.0.0.1:55432`. O iniciador recusa configuracao de banco remoto, nao cria um banco substituto e nao encerra processos que ocupam a porta.
+
+Para verificar sem abrir uma nova aba: `iniciar-get-wise.bat -NoBrowser`. Preferencia de navegacao do projeto: Google Chrome para avaliar design e responsividade.
+
+Revisão retomada em 12/11/2026 na PR #3: horários dos painéis e listas usam explicitamente America/Sao_Paulo. Tanto o painel administrativo quanto a lista de aulas excluem reservas canceladas da ocupação. Testes de regressão verificam a conversão de UTC na virada do dia e a exibição de uma vaga ocupada quando há uma reserva ativa e outra cancelada.
+
 A equipe acessa Aulas → Turmas e agenda para criar encontros semanais A1, A2 ou A3, indicar o mentor e definir vagas. O cadastro de alunos nesses níveis requer uma turma com vagas e gera as reservas futuras na mesma transação. Alunos anteriores podem ser alocados pela lista de turmas.
 
 O aluno abre Confirmar aulas para confirmar, justificar ausência, escolher outro encontro e reservar aulas adicionais do mesmo nível. A remarcação preserva a turma fixa, respeita o período do curso e impede sobreposição de horários. O professor encontra a lista atualizada em Minhas aulas. A confirmação de intenção é independente da chamada de presença.

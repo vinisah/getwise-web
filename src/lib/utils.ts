@@ -47,6 +47,7 @@ export function formatDateTime(date: Date | string): string {
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
+    timeZone: "America/Sao_Paulo",
   }).format(new Date(date));
 }
 

@@ -22,7 +22,7 @@ function getGroq() {
   maxRetries: 1,
 });
 }
-const GROQ_MODEL = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
+const GROQ_MODEL = process.env.GROQ_MODEL ?? "openai/gpt-oss-120b";
 
 const SYSTEM_PROMPT = `Você é uma Assistente Profissional de Inglês da escola Get Wise, com experiência equivalente a professores certificados internacionais. Ensine inglês de forma estruturada, prática e eficiente para alunos de qualquer nível (A1 ao C2).
 
