@@ -43,6 +43,7 @@ export default function TutorPage() {
   useEffect(() => {
     const container = scrollRef.current;
     if (!container || !followMessages.current) return;
+    if (messages.length === 0) { container.scrollTop = 0; return; }
     if (lastMessage.current) {
       container.scrollTop += lastMessage.current.getBoundingClientRect().top - container.getBoundingClientRect().top - 12;
     } else container.scrollTop = container.scrollHeight;

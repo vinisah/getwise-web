@@ -39,7 +39,8 @@ describe("Respostas formatadas da Wise", () => {
   });
 
   it("completes even long replies within ten seconds and clears timers on unmount", () => {
-    const { unmount } = render(<TutorMessage animate content={"palavra ".repeat(1000)} />);
+    // 200 words exceed the nine-second reveal cap without a huge test DOM.
+    const { unmount } = render(<TutorMessage animate content={"palavra ".repeat(200)} />);
     act(() => vi.advanceTimersByTime(10000));
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     unmount();
