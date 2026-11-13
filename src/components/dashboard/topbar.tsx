@@ -60,7 +60,14 @@ export function Topbar({ previewRole }: { previewRole?: string } = {}) {
   return (
     <header className="gw-topbar">
       <div className="gw-topbar-heading">
-        <button className="gw-burger" onClick={() => setOpen(true)} aria-label="Abrir menu">
+        <button
+          className="gw-burger"
+          onClick={(event) => {
+            event.currentTarget.focus({ preventScroll: true });
+            setOpen(true);
+          }}
+          aria-label="Abrir menu"
+        >
           <Menu size={22} />
         </button>
         <div className="gw-topbar-title">

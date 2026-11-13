@@ -134,7 +134,15 @@ export function TweaksPanel() {
 
   return (
     <>
-      <button className="gw-icon-btn" aria-label="Aparência" title="Aparência" onClick={() => setOpen(true)}>
+      <button
+        className="gw-icon-btn"
+        aria-label="Aparência"
+        title="Aparência"
+        onClick={(event) => {
+          event.currentTarget.focus({ preventScroll: true });
+          setOpen(true);
+        }}
+      >
         <Settings size={18} />
       </button>
 

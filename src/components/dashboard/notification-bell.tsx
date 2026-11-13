@@ -72,7 +72,8 @@ export function NotificationBell() {
         aria-label={`Notificações${unread > 0 ? ` (${unread} não lidas)` : ""}`}
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => {
+        onClick={(event) => {
+          event.currentTarget.focus({ preventScroll: true });
           setOpen((o) => !o);
           if (!open) load();
         }}

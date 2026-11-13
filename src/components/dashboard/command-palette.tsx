@@ -71,7 +71,15 @@ export function CommandPalette() {
 
   return (
     <>
-      <button className="gw-icon-btn" title="Buscar (Ctrl+K)" aria-label="Buscar" onClick={() => setOpen(true)}>
+      <button
+        className="gw-icon-btn"
+        title="Buscar (Ctrl+K)"
+        aria-label="Buscar"
+        onClick={(event) => {
+          event.currentTarget.focus({ preventScroll: true });
+          setOpen(true);
+        }}
+      >
         <Search size={18} />
       </button>
       <AppDialog open={open} onClose={() => setOpen(false)} label="Busca" placement="search">
