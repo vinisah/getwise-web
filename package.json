@@ -19,7 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "vercel-build": "node scripts/migrate-scheduling.mjs && next build",
+    "vercel-build": "node scripts/migrate-scheduling.mjs && next build --webpack",
     "db:scheduling": "node scripts/migrate-scheduling.mjs"
   },
   "lint-staged": {
