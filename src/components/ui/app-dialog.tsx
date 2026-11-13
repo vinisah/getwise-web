@@ -20,9 +20,19 @@ export function AppDialog(props: DialogProps) {
   return props.open ? <OpenDialog {...props} /> : null;
 }
 
-function OpenDialog({ onClose, label, children, placement = "search", anchorRef, className }: DialogProps) {
+function OpenDialog({
+  onClose,
+  label,
+  children,
+  placement = "search",
+  anchorRef,
+  className,
+}: Omit<DialogProps, "open">) {
   const ref = useRef<HTMLDialogElement>(null);
-  const pressedBackdrop = useRef(false);
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -47,6 +57,19 @@ function OpenDialog({ onClose, label, children, placement = "search", anchorRef,
         dialog.style.setProperty("--anchor-height", `${Math.max(120, offset + height - top - 16)}px`);
       }
     };
+    // Native Escape/cancel supplies keyboard dismissal; these listeners only handle backdrop taps.
+    let pressedBackdrop = false;
+    const pointerDown = (event: PointerEvent) => {
+      const r = dialog.getBoundingClientRect();
+      pressedBackdrop =
+        event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom;
+    };
+    const click = (event: MouseEvent) => {
+      if (event.target === dialog && pressedBackdrop) closeRef.current();
+      pressedBackdrop = false;
+    };
+    dialog.addEventListener("pointerdown", pointerDown);
+    dialog.addEventListener("click", click);
     position();
     dialog.showModal();
     document.documentElement.style.overflow = "hidden";
@@ -54,6 +77,8 @@ function OpenDialog({ onClose, label, children, placement = "search", anchorRef,
     viewport?.addEventListener("resize", position);
     viewport?.addEventListener("scroll", position);
     return () => {
+      dialog.removeEventListener("pointerdown", pointerDown);
+      dialog.removeEventListener("click", click);
       window.removeEventListener("resize", position);
       viewport?.removeEventListener("resize", position);
       viewport?.removeEventListener("scroll", position);
@@ -73,15 +98,6 @@ function OpenDialog({ onClose, label, children, placement = "search", anchorRef,
       onCancel={(event) => {
         event.preventDefault();
         onClose();
-      }}
-      onPointerDown={(event) => {
-        const r = event.currentTarget.getBoundingClientRect();
-        pressedBackdrop.current =
-          event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom;
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget && pressedBackdrop.current) onClose();
-        pressedBackdrop.current = false;
       }}
     >
       {children}

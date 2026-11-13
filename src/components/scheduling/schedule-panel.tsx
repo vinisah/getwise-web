@@ -480,8 +480,9 @@ export function SchedulePanel({ admin = false }: { admin?: boolean }) {
             {data.profile?.level && <Badge tone="blue">Nível {data.profile.level}</Badge>}
           </div>
           <Card className={styles.consent}>
-            <label className={styles.consentLabel}>
+            <label className={styles.consentLabel} htmlFor="whatsapp-consent">
               <input
+                id="whatsapp-consent"
                 type="checkbox"
                 checked={data.profile?.whatsappOptIn ?? false}
                 disabled={busy}

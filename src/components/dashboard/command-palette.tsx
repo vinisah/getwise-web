@@ -88,7 +88,6 @@ export function CommandPalette() {
             <Search size={18} color="var(--muted)" />
             <input
               ref={inputRef}
-              autoFocus
               aria-label="Buscar no sistema"
               value={q}
               onChange={(e) => setQ(e.target.value)}

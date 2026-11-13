@@ -70,7 +70,7 @@ describe("Interface móvel compartilhada", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
     render(<CommandPalette />);
-    fireEvent.click(screen.getByRole("button", { name: "Buscar", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     const input = screen.getByRole("textbox", { name: "Buscar no sistema" });
     fireEvent.change(input, { target: { value: "curso" } });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
