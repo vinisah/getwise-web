@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { useEffect, useSyncExternalStore } from "react";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { useMobileNav } from "@/components/dashboard/mobile-nav";
+import { usePreferences } from "@/components/preferences/preferences-provider";
 import { cx, getInitials } from "@/lib/utils";
 import { adminCanAccess } from "@/lib/access";
 import { Logo } from "@/components/gw/logo";
@@ -27,6 +28,7 @@ import {
   Bot,
   BookOpen,
   Award,
+  Settings,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -63,6 +65,8 @@ const NAV: Record<string, NavEntry[]> = {
     { id: "tutor", label: "Tutor IA", href: "/student/tutor", icon: Bot, badge: "AI" },
     { section: "Conquistas" },
     { id: "certificates", label: "Certificados", href: "/student/certificates", icon: Award },
+    { section: "Meu espaço" },
+    { id: "settings", label: "Minhas preferências", href: "/student/settings", icon: Settings },
   ],
   TEACHER: [
     { section: "Ensinar" },
@@ -99,6 +103,7 @@ export function Sidebar({ previewRole, previewName }: { previewRole?: string; pr
   const pathname = usePathname();
   const { data: session } = useSession();
   const { open, setOpen } = useMobileNav();
+  const { prefs } = usePreferences();
   const mobile = useSyncExternalStore(
     subscribeViewport,
     () => window.matchMedia(MOBILE_QUERY).matches,
@@ -107,7 +112,7 @@ export function Sidebar({ previewRole, previewName }: { previewRole?: string; pr
   const user = session?.user as { name?: string; email?: string; role?: string } | undefined;
   // Em "ver como" (admin), o role/nome efetivos vêm do servidor e dirigem a navegação.
   const role = previewRole || user?.role || "STUDENT";
-  const displayName = previewName ?? user?.name;
+  const displayName = previewName ?? (prefs.nickname || user?.name);
   // RBAC: admin com perfil restrito vê só as seções permitidas (null = dono = tudo).
   const sections = (user as { profileSections?: string[] | null } | undefined)?.profileSections ?? null;
   let nav = NAV[role] || NAV.STUDENT;

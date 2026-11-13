@@ -9,6 +9,7 @@ import { RoleSwitcher } from "@/components/dashboard/role-switcher";
 import { CommandPalette } from "@/components/dashboard/command-palette";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { LogOut, Menu } from "lucide-react";
+import { usePreferences } from "@/components/preferences/preferences-provider";
 
 const TITLES: Record<string, { title: string; sub?: string }> = {
   "/admin": { title: "Dashboard", sub: "Visão geral do mês" },
@@ -40,6 +41,7 @@ const TITLES: Record<string, { title: string; sub?: string }> = {
   },
   "/student/exercises": { title: "Exercícios", sub: "Pratique vocabulário e gramática" },
   "/student/tutor": { title: "Tutor de Inglês", sub: "Powered by IA · Pratique a qualquer hora" },
+  "/student/settings": { title: "Minhas preferências", sub: "Seu espaço de aprendizado, do seu jeito" },
   "/student/certificates": { title: "Certificados", sub: "Suas conquistas" },
   "/teacher": { title: "Dashboard", sub: "Portal do professor" },
   "/teacher/lessons": { title: "Minhas Aulas", sub: "Agenda e presença" },
@@ -49,6 +51,7 @@ export function Topbar({ previewRole }: { previewRole?: string } = {}) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const { setOpen } = useMobileNav();
+  const { prefs } = usePreferences();
   const realRole = (session?.user as { role?: string } | undefined)?.role;
   // Papel da visão atual (previewRole quando admin "vendo como" aluno/professor).
   const role = previewRole || realRole || "STUDENT";
@@ -73,7 +76,7 @@ export function Topbar({ previewRole }: { previewRole?: string } = {}) {
         <div className="gw-topbar-title">
           <Eyebrow>{eyebrow}</Eyebrow>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--ink)", letterSpacing: "-.025em", marginTop: 3 }}>
-            {meta.title}
+            {pathname === "/student" && !previewRole && prefs.nickname ? `Olá, ${prefs.nickname}!` : meta.title}
           </h1>
           {meta.sub && <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>{meta.sub}</p>}
         </div>
