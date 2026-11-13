@@ -42,8 +42,8 @@ type Schedule = {
   available: Lesson[];
 };
 type AdminData = {
-  canAssign?: boolean;
-  canPreview?: boolean;
+  canAssign: boolean;
+  canPreview: boolean;
   cohorts: {
     id: string;
     name: string;
@@ -281,7 +281,7 @@ export function SchedulePanel({ admin = false }: { admin?: boolean }) {
               const fields = Object.fromEntries(new FormData(event.currentTarget));
               void act({
                 ...fields,
-                startsAt: new Date(String(fields.startsAt) + "-03:00").toISOString(),
+                startsAt: String(fields.startsAt) + "-03:00",
                 action: "createCohort",
               });
             }}
@@ -431,7 +431,7 @@ export function SchedulePanel({ admin = false }: { admin?: boolean }) {
                       <Badge tone="slate">
                         {management.cohorts.find((c) => c.id === student.studentProfile?.cohortId)?.name}
                       </Badge>
-                    ) : management.canAssign !== false ? (
+                    ) : management.canAssign ? (
                       <Button
                         type="button"
                         size="sm"
@@ -446,7 +446,7 @@ export function SchedulePanel({ admin = false }: { admin?: boolean }) {
                       <span className={styles.secondary}>Aguardando alocação pela equipe autorizada</span>
                     )}
                   </div>
-                  {management.canPreview !== false && (
+                  {management.canPreview && (
                     <Button
                       type="button"
                       variant="ghost"

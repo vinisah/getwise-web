@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { SchedulePanel } from "@/components/scheduling/schedule-panel";
+import { AttendanceForm } from "@/app/(dashboard)/teacher/lessons/attendance-form";
+import NewLessonPage from "@/app/(dashboard)/admin/lessons/new/page";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 
@@ -110,40 +112,47 @@ describe("Agenda — respostas e navegação", () => {
   });
 });
 
-describe("Compatibilidade com a agenda publicada", () => {
-  it("mantém as ações do administrador quando a API legada omite capacidades", async () => {
+describe("Agenda do professor", () => {
+  it("lista renovada remove realocado, inclui novo aluno e preserva edição de quem permanece", async () => {
+    fetchMock.mockResolvedValueOnce(json({ ok: true }));
+    const ana = { studentId: "a", name: "Ana", attendance: null };
+    const bia = { studentId: "b", name: "Bia", attendance: null };
+    const caio = { studentId: "c", name: "Caio", attendance: null };
+    const view = render(<AttendanceForm lessonId="l1" students={[ana, bia]} />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Presente" })[1]);
+    view.rerender(<AttendanceForm lessonId="l1" students={[bia, caio]} />);
+    expect(screen.queryByText("Ana")).not.toBeInTheDocument();
+    expect(screen.getByText("Caio")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar presença" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).entries).toEqual([
+      { studentId: "b", attendance: true },
+      { studentId: "c", attendance: null },
+    ]);
+  });
+});
+
+describe("Cadastro manual de aula", () => {
+  it("usa a permissão da agenda, permite definir vagas e limpa a seleção ao trocar de nível", async () => {
     fetchMock.mockResolvedValueOnce(
       json({
-        cohorts: [],
-        teachers: [],
-        students: [{ id: "s1", name: "Aluno", studentProfile: { level: "A1", cohortId: null } }],
+        teachers: [{ id: "t1", name: "Mentor" }],
+        students: [
+          { id: "s1", name: "Ana A1", studentProfile: { level: "A1" } },
+          { id: "s2", name: "Bia A2", studentProfile: { level: "A2" } },
+        ],
       })
     );
-    render(<SchedulePanel admin />);
-    expect(await screen.findByRole("button", { name: "Alocar em turma do mesmo nível" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Ver agenda do aluno" })).toBeEnabled();
-  });
-
-  it("mantém o instante de Brasília no payload esperado pelo cadastro publicado", async () => {
-    const management = { cohorts: [], teachers: [{ id: "t1", name: "Mentor" }], students: [] };
-    fetchMock
-      .mockResolvedValueOnce(json(management))
-      .mockResolvedValueOnce(json({ ok: true }))
-      .mockResolvedValueOnce(json(management));
-    render(<SchedulePanel admin />);
-    const name = await screen.findByLabelText("Nome da turma");
-    fireEvent.change(name, { target: { value: "A1 · Terças" } });
-    fireEvent.change(screen.getByLabelText("Professor mentor"), { target: { value: "t1" } });
-    fireEvent.change(screen.getByLabelText("Conteúdo dos encontros"), { target: { value: "Conversação" } });
-    fireEvent.change(screen.getByLabelText("Primeiro encontro (Brasília)"), { target: { value: "2036-02-05T19:00" } });
-    fireEvent.submit(name.closest("form")!);
-    expect(await screen.findByText("Agenda atualizada.")).toBeInTheDocument();
-    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
-    expect(JSON.parse(post![1].body)).toMatchObject({
-      action: "createCohort",
-      startsAt: "2036-02-05T22:00:00.000Z",
-      teacherId: "t1",
-      level: "A1",
-    });
+    render(<NewLessonPage />);
+    expect(await screen.findByText("Ana A1")).toBeInTheDocument();
+    expect(screen.queryByText("Bia A2")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Capacidade da aula")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.change(screen.getByLabelText("Nível"), { target: { value: "A2" } });
+    expect(screen.queryByText("Ana A1")).not.toBeInTheDocument();
+    expect(screen.getByText("Bia A2")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Nível"), { target: { value: "A1" } });
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/scheduling?admin=true");
   });
 });

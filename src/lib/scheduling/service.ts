@@ -2,7 +2,7 @@ import { randomInt } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-error";
 import { Prisma } from "@prisma/client";
-import { CohortInput, ResponseInput, assertAvailable, weeklyDates } from "./rules";
+import { CohortInput, ResponseInput, assertAvailable, weeklyDates, overlaps } from "./rules";
 import type { z } from "zod";
 
 export async function schedulingTransaction<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
@@ -13,6 +13,49 @@ export async function schedulingTransaction<T>(operation: (tx: Prisma.Transactio
     },
     { timeout: 20000 }
   );
+}
+
+type Slot = { id?: string; scheduledAt: Date; duration: number };
+
+export async function assertStudentSlot(tx: Prisma.TransactionClient, studentId: string, target: Slot) {
+  const bookings = await tx.lessonBooking.findMany({
+    where: {
+      studentId,
+      status: { not: "CANCELLED" },
+      lesson: {
+        status: { in: ["SCHEDULED", "IN_PROGRESS"] },
+        scheduledAt: {
+          gte: new Date(target.scheduledAt.getTime() - 180 * 60000),
+          lt: new Date(target.scheduledAt.getTime() + target.duration * 60000),
+        },
+      },
+    },
+    include: { lesson: true },
+  });
+  if (bookings.some((b) => b.lessonId !== target.id && overlaps(b.lesson, target))) {
+    throw new ApiError(409, "Você já tem uma aula neste horário");
+  }
+}
+
+export async function assertTeacherSlot(tx: Prisma.TransactionClient, teacherId: string, target: Slot) {
+  const teacher = await tx.user.findFirst({
+    where: { id: teacherId, role: "TEACHER", isActive: true },
+    select: { id: true },
+  });
+  if (!teacher) throw new ApiError(409, "Aula indisponível: professor inativo ou inválido");
+  const lessons = await tx.lesson.findMany({
+    where: {
+      teacherId,
+      status: { not: "CANCELLED" },
+      scheduledAt: {
+        gte: new Date(target.scheduledAt.getTime() - 180 * 60000),
+        lt: new Date(target.scheduledAt.getTime() + target.duration * 60000),
+      },
+    },
+  });
+  if (lessons.some((lesson) => lesson.id !== target.id && overlaps(lesson, target))) {
+    throw new ApiError(409, "O professor já tem aula neste horário");
+  }
 }
 
 export async function createCohort(input: z.infer<typeof CohortInput>) {
@@ -74,7 +117,10 @@ export async function assignStudent(studentId: string, transaction?: Prisma.Tran
         _count: { select: { students: true } },
         lessons: {
           where: { scheduledAt: { gt: new Date() }, status: "SCHEDULED" },
-          include: { _count: { select: { bookings: { where: { status: { not: "CANCELLED" } } } } } },
+          include: {
+            teacher: { select: { isActive: true, role: true } },
+            _count: { select: { bookings: { where: { status: { not: "CANCELLED" } } } } },
+          },
         },
       },
     });
@@ -82,7 +128,10 @@ export async function assignStudent(studentId: string, transaction?: Prisma.Tran
       where: {
         studentId,
         status: { not: "CANCELLED" },
-        lesson: { scheduledAt: { gt: new Date() }, status: "SCHEDULED" },
+        lesson: {
+          scheduledAt: { gt: new Date(Date.now() - 180 * 60000) },
+          status: { in: ["SCHEDULED", "IN_PROGRESS"] },
+        },
       },
       include: { lesson: true },
     });
@@ -99,7 +148,13 @@ export async function assignStudent(studentId: string, transaction?: Prisma.Tran
               booking.lesson.scheduledAt.getTime() < lesson.scheduledAt.getTime() + lesson.duration * 60000 &&
               booking.lesson.scheduledAt.getTime() + booking.lesson.duration * 60000 > lesson.scheduledAt.getTime()
           );
-          return occupied < lesson.maxStudents && !conflicting;
+          return (
+            occupied < lesson.maxStudents &&
+            !conflicting &&
+            lesson.level === profile.level &&
+            lesson.teacher.isActive &&
+            lesson.teacher.role === "TEACHER"
+          );
         })
     );
     if (!available.length)
@@ -108,6 +163,19 @@ export async function assignStudent(studentId: string, transaction?: Prisma.Tran
     await tx.lessonBooking.createMany({
       data: cohort.lessons.map((l) => ({ lessonId: l.id, studentId })),
       skipDuplicates: true,
+    });
+    // Uma reserva antiga cancelada já ocupa a chave única: skipDuplicates não a reativa.
+    await tx.lessonBooking.updateMany({
+      where: { studentId, lessonId: { in: cohort.lessons.map((l) => l.id) }, status: "CANCELLED" },
+      data: {
+        status: "SCHEDULED",
+        confirmation: "PENDING",
+        absenceReason: null,
+        attendance: null,
+        rating: null,
+        feedback: null,
+        reminderSentAt: null,
+      },
     });
     return tx.studentProfile.update({ where: { userId: studentId }, data: { cohortId: cohort.id } });
   };
@@ -131,6 +199,15 @@ export async function respond(studentId: string, input: z.infer<typeof ResponseI
       });
     }
     if (input.action === "confirm") {
+      if (!booking.student.studentProfile || booking.student.studentProfile.level !== booking.lesson.level) {
+        throw new ApiError(409, "Escolha uma aula do mesmo nível");
+      }
+      const teacher = await tx.user.findFirst({
+        where: { id: booking.lesson.teacherId, isActive: true, role: "TEACHER" },
+        select: { id: true },
+      });
+      if (!teacher) throw new ApiError(409, "Aula indisponível: professor inativo ou inválido");
+      await assertStudentSlot(tx, studentId, booking.lesson);
       if (booking.status === "CANCELLED") {
         const occupied = await tx.lessonBooking.count({
           where: { lessonId: booking.lessonId, status: { not: "CANCELLED" } },
@@ -140,16 +217,21 @@ export async function respond(studentId: string, input: z.infer<typeof ResponseI
       }
       return tx.lessonBooking.update({
         where: { id: booking.id },
-        data: { status: "SCHEDULED", confirmation: "CONFIRMED" },
+        data: { status: "SCHEDULED", confirmation: "CONFIRMED", absenceReason: null },
       });
     }
     if (booking.confirmation !== "DECLINED") throw new ApiError(409, "Justifique a ausência antes de remarcar");
-    const target = await tx.lesson.findUnique({ where: { id: input.lessonId } });
+    const target = await tx.lesson.findUnique({
+      where: { id: input.lessonId },
+      include: { teacher: { select: { isActive: true, role: true } } },
+    });
     if (
       !target ||
       target.scheduledAt <= new Date() ||
       target.status !== "SCHEDULED" ||
       !target.cohortId ||
+      !target.teacher.isActive ||
+      target.teacher.role !== "TEACHER" ||
       target.id === booking.lessonId
     )
       throw new ApiError(400, "Aula indisponível");
@@ -165,22 +247,12 @@ export async function respond(studentId: string, input: z.infer<typeof ResponseI
     } catch (error) {
       throw new ApiError(409, (error as Error).message);
     }
-    const overlaps = await tx.lessonBooking.findMany({
-      where: {
-        studentId,
-        status: { not: "CANCELLED" },
-        lesson: {
-          status: "SCHEDULED",
-          scheduledAt: {
-            lt: new Date(target.scheduledAt.getTime() + target.duration * 60000),
-            gte: new Date(target.scheduledAt.getTime() - 180 * 60000),
-          },
-        },
-      },
-      include: { lesson: true },
+    const existingTarget = await tx.lessonBooking.findUnique({
+      where: { lessonId_studentId: { lessonId: target.id, studentId } },
     });
-    if (overlaps.some((b) => b.lesson.scheduledAt.getTime() + b.lesson.duration * 60000 > target.scheduledAt.getTime()))
-      throw new ApiError(409, "Você já tem uma aula neste horário");
+    if (existingTarget && existingTarget.status !== "CANCELLED")
+      throw new ApiError(409, "Você já está inscrito nesta aula");
+    await assertStudentSlot(tx, studentId, target);
     await tx.lessonBooking.upsert({
       where: { lessonId_studentId: { lessonId: target.id, studentId } },
       create: { lessonId: target.id, studentId, confirmation: "CONFIRMED" },
@@ -198,10 +270,15 @@ export async function bookAdditionalLesson(studentId: string, lessonId: string) 
     const profile = await tx.studentProfile.findUnique({ where: { userId: studentId } });
     if (!profile?.cohortId) throw new ApiError(409, "A equipe precisa definir sua turma");
     const end = await tx.lesson.findFirst({ where: { cohortId: profile.cohortId }, orderBy: { scheduledAt: "desc" } });
-    const lesson = await tx.lesson.findUnique({ where: { id: lessonId } });
+    const lesson = await tx.lesson.findUnique({
+      where: { id: lessonId },
+      include: { teacher: { select: { isActive: true, role: true } } },
+    });
     if (
       !lesson ||
       !lesson.cohortId ||
+      !lesson.teacher.isActive ||
+      lesson.teacher.role !== "TEACHER" ||
       lesson.status !== "SCHEDULED" ||
       lesson.scheduledAt <= new Date() ||
       !end ||
@@ -209,29 +286,22 @@ export async function bookAdditionalLesson(studentId: string, lessonId: string) 
     )
       throw new ApiError(400, "Aula indisponível");
     const existing = await tx.lessonBooking.findUnique({ where: { lessonId_studentId: { lessonId, studentId } } });
-    if (existing && existing.status !== "CANCELLED") return existing;
     const count = await tx.lessonBooking.count({ where: { lessonId, status: { not: "CANCELLED" } } });
     try {
-      assertAvailable(profile.level, lesson.level, lesson.maxStudents, count);
+      assertAvailable(
+        profile.level,
+        lesson.level,
+        lesson.maxStudents,
+        count - Number(!!existing && existing.status !== "CANCELLED")
+      );
     } catch (error) {
       throw new ApiError(409, (error as Error).message);
     }
-    const bookings = await tx.lessonBooking.findMany({
-      where: { studentId, status: { not: "CANCELLED" }, lesson: { status: "SCHEDULED" } },
-      include: { lesson: true },
-    });
-    if (
-      bookings.some(
-        (b) =>
-          b.lesson.scheduledAt.getTime() < lesson.scheduledAt.getTime() + lesson.duration * 60000 &&
-          b.lesson.scheduledAt.getTime() + b.lesson.duration * 60000 > lesson.scheduledAt.getTime()
-      )
-    )
-      throw new ApiError(409, "Você já tem aula neste horário");
+    await assertStudentSlot(tx, studentId, lesson);
     return tx.lessonBooking.upsert({
       where: { lessonId_studentId: { lessonId, studentId } },
       create: { lessonId, studentId, confirmation: "CONFIRMED" },
-      update: { status: "SCHEDULED", confirmation: "CONFIRMED" },
+      update: { status: "SCHEDULED", confirmation: "CONFIRMED", absenceReason: null },
     });
   });
 }

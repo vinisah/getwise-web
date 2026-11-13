@@ -22,3 +22,10 @@ export function assertAvailable(level: string, targetLevel: string, capacity: nu
 export function weeklyDates(start: string, weeks: number): Date[] {
   return Array.from({ length: weeks }, (_, index) => new Date(new Date(start).getTime() + index * 7 * 86400000));
 }
+
+export function overlaps(a: { scheduledAt: Date; duration: number }, b: { scheduledAt: Date; duration: number }) {
+  return (
+    a.scheduledAt.getTime() < b.scheduledAt.getTime() + b.duration * 60000 &&
+    b.scheduledAt.getTime() < a.scheduledAt.getTime() + a.duration * 60000
+  );
+}

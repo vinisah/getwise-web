@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cx } from "@/lib/utils";
 import { Check, X } from "lucide-react";
@@ -17,8 +17,23 @@ export function AttendanceForm({ lessonId, students }: { lessonId: string; stude
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState("");
+  const dirty = useRef(new Set<string>());
+  useEffect(() => {
+    // Atualizações da agenda removem quem remarcou e incluem novos participantes,
+    // preservando apenas marcações locais ainda não salvas dos alunos que continuam.
+    setRows((previous) =>
+      students.map((student) =>
+        dirty.current.has(student.studentId)
+          ? (previous.find((row) => row.studentId === student.studentId) ?? student)
+          : student
+      )
+    );
+    dirty.current = new Set([...dirty.current].filter((id) => students.some((student) => student.studentId === id)));
+    setSaved(false);
+  }, [students]);
 
   function patch(id: string, p: Partial<Student>) {
+    dirty.current.add(id);
     setRows((r) => r.map((s) => (s.studentId === id ? { ...s, ...p } : s)));
     setSaved(false);
   }
@@ -33,11 +48,13 @@ export function AttendanceForm({ lessonId, students }: { lessonId: string; stude
         body: JSON.stringify({
           entries: rows.map((s) => ({ studentId: s.studentId, attendance: s.attendance })),
         }),
+        signal: AbortSignal.timeout(25000),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => null);
         setErr(d?.error || "Não foi possível salvar.");
       } else {
+        dirty.current.clear();
         setSaved(true);
       }
     } catch {
@@ -65,6 +82,7 @@ export function AttendanceForm({ lessonId, students }: { lessonId: string; stude
               <div className="gw-seg-group">
                 <button
                   type="button"
+                  disabled={saving}
                   className={cx("gw-seg", s.attendance === true && "active")}
                   onClick={() => patch(s.studentId, { attendance: true })}
                 >
@@ -72,6 +90,7 @@ export function AttendanceForm({ lessonId, students }: { lessonId: string; stude
                 </button>
                 <button
                   type="button"
+                  disabled={saving}
                   className={cx("gw-seg", s.attendance === false && "active")}
                   onClick={() => patch(s.studentId, { attendance: false })}
                 >

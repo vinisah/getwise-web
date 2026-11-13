@@ -74,16 +74,22 @@ export const CreatePlanSchema = z.object({
 
 // ─── Aulas ────────────────────────────────────────────────────────────────────
 
+const LessonDateTime = z.preprocess(
+  (value) =>
+    typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value) ? `${value}-03:00` : value,
+  z.string().datetime({ offset: true, message: "Data e hora inválidas" })
+);
+
 export const CreateLessonSchema = z.object({
   title: z.string().min(2).max(200),
   teacherId: z.string().optional(),
   description: z.string().max(1000).optional(),
-  scheduledAt: DateString,
+  scheduledAt: LessonDateTime,
   duration: z.coerce.number().int().min(15).max(180).default(50),
   meetingUrl: OptionalUrl,
   level: CEFRLevel.default("A1"),
   maxStudents: z.coerce.number().int().min(1).max(30).default(1),
-  studentIds: z.array(z.string().min(1)).optional(),
+  studentIds: z.array(z.string().min(1)).max(100).optional(),
   notes: z.string().max(1000).optional(),
 });
 
@@ -92,7 +98,7 @@ export const UpdateLessonSchema = z
   .object({
     title: z.string().min(2).max(200).optional(),
     description: z.string().max(1000).optional(),
-    scheduledAt: OptionalDateString,
+    scheduledAt: LessonDateTime.optional(),
     duration: z.coerce.number().int().min(15).max(180).optional(),
     meetingUrl: OptionalUrl,
     level: CEFRLevel.optional(),
