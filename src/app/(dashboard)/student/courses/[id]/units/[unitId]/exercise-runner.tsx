@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/gw/primitives";
 import { CheckCircle, XCircle, Lock, Mic, Headphones } from "lucide-react";
-import { cx } from "@/lib/utils";
+import { OptionRow } from "@/components/exercises/option-row";
 
 interface Exercise {
   id: string;
@@ -25,16 +25,20 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-export function ExerciseRunner({
-  exercises,
-  locked,
-}: {
-  exercises: Exercise[];
-  locked: boolean;
-}) {
+export function ExerciseRunner({ exercises, locked }: { exercises: Exercise[]; locked: boolean }) {
   if (locked) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 20, background: "var(--bg)", borderRadius: "var(--r-sm)", color: "var(--muted)" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: 20,
+          background: "var(--bg)",
+          borderRadius: "var(--r-sm)",
+          color: "var(--muted)",
+        }}
+      >
         <Lock size={18} /> Assista pelo menos 90% do vídeo para liberar os exercícios.
       </div>
     );
@@ -54,7 +58,12 @@ function ExerciseCard({ exercise, index }: { exercise: Exercise; index: number }
   const question = String(c.question ?? c.prompt ?? exercise.title);
 
   const [answer, setAnswer] = useState<unknown>(null);
-  const [result, setResult] = useState<null | { passed: boolean; scorePercent: number; explanation?: string; unitCompleted?: boolean }>(null);
+  const [result, setResult] = useState<null | {
+    passed: boolean;
+    scorePercent: number;
+    explanation?: string;
+    unitCompleted?: boolean;
+  }>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -91,17 +100,49 @@ function ExerciseCard({ exercise, index }: { exercise: Exercise; index: number }
 
   return (
     <div className="gw-card" style={{ padding: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <span style={{ fontSize: 12, fontFamily: "var(--mono)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".08em" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 8,
+          marginBottom: 10,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 12,
+            fontFamily: "var(--mono)",
+            color: "var(--muted)",
+            textTransform: "uppercase",
+            letterSpacing: ".08em",
+          }}
+        >
           Exercício {index} · {exercise.points} pts {exercise.isRequired && "· obrigatório"}
         </span>
-        {result && <Badge tone={result.passed ? "green" : "red"}>{result.passed ? `Aprovado ${result.scorePercent}%` : `${result.scorePercent}%`}</Badge>}
+        {result && (
+          <Badge tone={result.passed ? "green" : "red"}>
+            {result.passed ? `Aprovado ${result.scorePercent}%` : `${result.scorePercent}%`}
+          </Badge>
+        )}
       </div>
       <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", marginBottom: 14 }}>{question}</p>
 
       {/* ── Stub: ditado/pronúncia ── */}
       {stub && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 16, background: "var(--violet-soft)", color: "var(--violet)", borderRadius: "var(--r-sm)", fontSize: 14 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: 16,
+            background: "var(--violet-soft)",
+            color: "var(--violet)",
+            borderRadius: "var(--r-sm)",
+            fontSize: 14,
+          }}
+        >
           {exercise.type === "PRONUNCIATION" ? <Mic size={18} /> : <Headphones size={18} />}
           🔒 {exercise.type === "PRONUNCIATION" ? "Pronúncia (gravação de voz)" : "Ditado (áudio)"} — em breve
         </div>
@@ -111,7 +152,13 @@ function ExerciseCard({ exercise, index }: { exercise: Exercise; index: number }
       {exercise.type === "MULTIPLE_CHOICE" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {((c.options as string[]) ?? []).map((opt) => (
-            <OptionRow key={opt} label={opt} selected={answer === opt} disabled={!!result?.passed} onClick={() => setAnswer(opt)} />
+            <OptionRow
+              key={opt}
+              label={opt}
+              selected={answer === opt}
+              disabled={!!result?.passed}
+              onClick={() => setAnswer(opt)}
+            />
           ))}
         </div>
       )}
@@ -120,7 +167,14 @@ function ExerciseCard({ exercise, index }: { exercise: Exercise; index: number }
       {exercise.type === "TRUE_FALSE" && (
         <div style={{ display: "flex", gap: 8 }}>
           {["True", "False"].map((opt) => (
-            <OptionRow key={opt} label={opt} selected={answer === opt} disabled={!!result?.passed} onClick={() => setAnswer(opt)} grow />
+            <OptionRow
+              key={opt}
+              label={opt}
+              selected={answer === opt}
+              disabled={!!result?.passed}
+              onClick={() => setAnswer(opt)}
+              grow
+            />
           ))}
         </div>
       )}
@@ -149,12 +203,23 @@ function ExerciseCard({ exercise, index }: { exercise: Exercise; index: number }
 
       {/* feedback */}
       {result && !result.passed && (
-        <div style={{ marginTop: 12, fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
+        <div
+          style={{ marginTop: 12, fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}
+        >
           <XCircle size={15} /> Não passou ({result.scorePercent}%).{result.explanation ? ` ${result.explanation}` : ""}
         </div>
       )}
       {result?.passed && (
-        <div style={{ marginTop: 12, fontSize: 13, color: "var(--success)", display: "flex", alignItems: "center", gap: 6 }}>
+        <div
+          style={{
+            marginTop: 12,
+            fontSize: 13,
+            color: "var(--success)",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
           <CheckCircle size={15} /> Correto! {result.unitCompleted && "Unidade concluída 🎉"}
         </div>
       )}
@@ -169,61 +234,86 @@ function ExerciseCard({ exercise, index }: { exercise: Exercise; index: number }
   );
 }
 
-function OptionRow({ label, selected, disabled, onClick, grow }: { label: string; selected: boolean; disabled: boolean; onClick: () => void; grow?: boolean }) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={cx("gw-chip")}
-      style={{
-        flex: grow ? 1 : undefined,
-        padding: "11px 14px",
-        textAlign: grow ? "center" : "left",
-        border: `1px solid ${selected ? "var(--accent)" : "var(--line)"}`,
-        background: selected ? "var(--accent-soft)" : "var(--card)",
-        color: selected ? "var(--accent)" : "var(--ink)",
-        fontWeight: selected ? 700 : 500,
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-function SentenceOrder({ words, disabled, onChange }: { words: string[]; disabled: boolean; onChange: (v: string[]) => void }) {
+function SentenceOrder({
+  words,
+  disabled,
+  onChange,
+}: {
+  words: string[];
+  disabled: boolean;
+  onChange: (v: string[]) => void;
+}) {
   const [bank, setBank] = useState(words);
   const [seq, setSeq] = useState<string[]>([]);
 
   function pick(w: string, i: number) {
     if (disabled) return;
-    const nb = [...bank]; nb.splice(i, 1);
+    const nb = [...bank];
+    nb.splice(i, 1);
     const ns = [...seq, w];
-    setBank(nb); setSeq(ns); onChange(ns);
+    setBank(nb);
+    setSeq(ns);
+    onChange(ns);
   }
   function unpick(i: number) {
     if (disabled) return;
-    const ns = [...seq]; const [w] = ns.splice(i, 1);
-    setSeq(ns); setBank([...bank, w]); onChange(ns);
+    const ns = [...seq];
+    const [w] = ns.splice(i, 1);
+    setSeq(ns);
+    setBank([...bank, w]);
+    onChange(ns);
   }
   return (
     <div>
-      <div style={{ minHeight: 44, display: "flex", flexWrap: "wrap", gap: 6, padding: 10, background: "var(--bg)", borderRadius: "var(--r-sm)", marginBottom: 8 }}>
+      <div
+        style={{
+          minHeight: 44,
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 6,
+          padding: 10,
+          background: "var(--bg)",
+          borderRadius: "var(--r-sm)",
+          marginBottom: 8,
+        }}
+      >
         {seq.map((w, i) => (
-          <button key={i} type="button" onClick={() => unpick(i)} className="gw-chip" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent)" }}>{w}</button>
+          <button
+            key={i}
+            type="button"
+            onClick={() => unpick(i)}
+            className="gw-chip"
+            style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent)" }}
+          >
+            {w}
+          </button>
         ))}
-        {seq.length === 0 && <span style={{ fontSize: 13, color: "var(--muted)" }}>Toque nas palavras para ordenar...</span>}
+        {seq.length === 0 && (
+          <span style={{ fontSize: 13, color: "var(--muted)" }}>Toque nas palavras para ordenar...</span>
+        )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {bank.map((w, i) => (
-          <button key={i} type="button" onClick={() => pick(w, i)} className="gw-chip">{w}</button>
+          <button key={i} type="button" onClick={() => pick(w, i)} className="gw-chip">
+            {w}
+          </button>
         ))}
       </div>
     </div>
   );
 }
 
-function WordMatch({ pairs, rights, disabled, onChange }: { pairs: { left: string; right: string }[]; rights: string[]; disabled: boolean; onChange: (v: [string, string][]) => void }) {
+function WordMatch({
+  pairs,
+  rights,
+  disabled,
+  onChange,
+}: {
+  pairs: { left: string; right: string }[];
+  rights: string[];
+  disabled: boolean;
+  onChange: (v: [string, string][]) => void;
+}) {
   const [sel, setSel] = useState<Record<string, string>>({});
   function set(left: string, right: string) {
     if (disabled) return;
@@ -235,15 +325,39 @@ function WordMatch({ pairs, rights, disabled, onChange }: { pairs: { left: strin
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {pairs.map((p) => (
         <div key={p.left} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{p.left}</span>
+          <span
+            style={{
+              flex: 1,
+              minWidth: 0,
+              overflowWrap: "anywhere",
+              fontSize: 14,
+              fontWeight: 600,
+              color: "var(--ink)",
+            }}
+          >
+            {p.left}
+          </span>
           <select
             value={sel[p.left] ?? ""}
             disabled={disabled}
             onChange={(e) => set(p.left, e.target.value)}
-            style={{ flex: 1, height: 38, borderRadius: "var(--r-sm)", border: "1px solid var(--line)", padding: "0 10px", fontSize: 14, background: "var(--card)" }}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              minHeight: 44,
+              borderRadius: "var(--r-sm)",
+              border: "1px solid var(--line)",
+              padding: "0 10px",
+              fontSize: 14,
+              background: "var(--card)",
+            }}
           >
             <option value="">Selecione...</option>
-            {rights.map((r) => <option key={r} value={r}>{r}</option>)}
+            {rights.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
           </select>
         </div>
       ))}

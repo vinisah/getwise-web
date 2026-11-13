@@ -61,6 +61,23 @@ Desativação/rebaixamento de usuário vale em tempo real (JWT revalida a cada r
 - _Erro_: mensagens em PT com o nome do campo (validação Zod → `zodMessage`); toast/alert.
 - _Confirmação_: ações destrutivas pedem confirmação.
 
+**Acabamento aprovado — Turmas e agenda / Confirmar aulas (12/11/2026):**
+
+- As rotas `/admin/lessons/turmas` e `/student/agenda` seguem a identidade existente; não introduzem tema, navegação ou regras de negócio novos.
+- A fonte dos tokens continua em `src/lib/theme.ts` → variáveis CSS em `src/app/globals.css` → componentes compartilhados `gw/primitives`, `ui/button` e `ui/input`. O CSS Module da agenda cuida apenas da composição local.
+- Cards usam `--card`, `--line`, `--r` e `--card-pad`; ações principais usam `Button variant="accent"`, secundárias usam `outline`/`ghost`. Estados combinam texto, ícone e os tons semânticos existentes.
+- Seletores, datas, validação nativa e diálogo modal mantêm a interação já usada no módulo. Os campos, limites, permissões, consentimento de WhatsApp, chamadas de API e sequência de remarcação são preservados.
+- Datas continuam em `pt-BR` e `America/Sao_Paulo`. O layout respeita as preferências de tema/densidade, reduz colunas no celular e mantém a rolagem natural da página.
+
+**Responsividade e evolução visual:**
+
+- Antes de implementar novas funções ou abas, apresentar uma proposta visual rápida e concisa dentro do contexto do sistema, seguindo sua identidade. Essa orientação foi solicitada pelo usuário; correções já aprovadas seguem seu escopo.
+- A revisão móvel cobre 320–1440 px, orientação retrato/paisagem, conteúdo longo, foco, áreas de toque e pouca altura disponível para simular o teclado. A preparação para aplicativos não substitui homologação em aparelhos iOS/Android reais.
+- `ui/app-dialog` é o componente compartilhado de busca, notificações, aparência e navegação móvel: usa a camada superior nativa, isola o fundo, limita o painel à área visível, permite Escape e restaura foco/rolagem. A agenda mantém seu diálogo existente.
+- No celular, o cabeçalho usa controles de pelo menos 44 px e um seletor nativo compacto para a visão administrativa. O menu fechado fica fora da interação e sem sombra sobre a página. O cabeçalho acompanha a rolagem para deixar o conteúdo e os campos acessíveis.
+- `exercises/option-row` compartilha o acabamento das alternativas entre prática e unidades: alvos de pelo menos 48 px, texto quebrável, seleção perceptível e comportamento de resposta preservado.
+- O viewport permite zoom e considera áreas seguras; campos móveis usam 16 px e os painéis acompanham `visualViewport`. Mantêm-se a paleta, tipografia, preferências de tema e componentes existentes.
+
 ---
 
 ## 3. Autenticação (`(auth)/`)

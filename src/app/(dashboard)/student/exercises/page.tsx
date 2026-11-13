@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Trophy, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OptionRow } from "@/components/exercises/option-row";
+import styles from "@/components/exercises/practice.module.css";
 
 interface Exercise {
   id: string;
@@ -97,7 +99,7 @@ export default function ExercisesPage() {
 
   if (exercises.length === 0) {
     return (
-      <div className="space-y-6">
+      <div className={styles.page}>
         <h1 className="text-3xl font-bold text-[var(--brand)]">Exercícios</h1>
         <Card>
           <CardContent className="p-12 text-center">
@@ -119,7 +121,7 @@ export default function ExercisesPage() {
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-[var(--brand)]">Exercícios</h1>
         <Card className="max-w-lg mx-auto">
-          <CardContent className="p-8 text-center space-y-6">
+          <CardContent className={styles.summary}>
             <div className="bg-yellow-100 rounded-full p-6 w-fit mx-auto">
               <Trophy className="h-12 w-12 text-yellow-600" />
             </div>
@@ -127,7 +129,7 @@ export default function ExercisesPage() {
               <h2 className="text-2xl font-bold text-[var(--brand)]">Well done!</h2>
               <p className="text-muted-foreground">You completed all exercises!</p>
             </div>
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className={styles.stats}>
               <div className="bg-muted rounded-lg p-3">
                 <p className="text-2xl font-bold text-[var(--brand)]">{completed}</p>
                 <p className="text-xs text-muted-foreground">Exercícios</p>
@@ -151,18 +153,18 @@ export default function ExercisesPage() {
     );
   }
 
-  const options: string[] = exercise.type === "MULTIPLE_CHOICE" ? exercise.content?.options ?? [] : [];
+  const options: string[] = exercise.type === "MULTIPLE_CHOICE" ? (exercise.content?.options ?? []) : [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className={styles.page}>
+      <div className={styles.header}>
         <div>
           <h1 className="text-3xl font-bold text-[var(--brand)]">Exercícios</h1>
           <p className="text-muted-foreground">
             {current + 1} de {exercises.length} · {score} pontos
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className={styles.meta}>
           <Badge variant="outline">{levelLabels[exercise.level]}</Badge>
           <Badge variant="secondary">{exercise.points} pts</Badge>
         </div>
@@ -172,49 +174,47 @@ export default function ExercisesPage() {
       <div className="w-full bg-muted rounded-full h-2">
         <div
           className="bg-[var(--brand)] h-2 rounded-full transition-all"
-          style={{ width: `${((current) / exercises.length) * 100}%` }}
+          style={{ width: `${(current / exercises.length) * 100}%` }}
         />
       </div>
 
-      <Card className="max-w-2xl">
+      <Card className={styles.card}>
         <CardHeader>
           <CardTitle className="text-lg text-[var(--brand)]">{exercise.title}</CardTitle>
-          {exercise.content?.question && (
-            <p className="text-base">{exercise.content.question}</p>
-          )}
+          {exercise.content?.question && <p className="text-base">{exercise.content.question}</p>}
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className={styles.content}>
           {exercise.type === "MULTIPLE_CHOICE" && (
-            <div className="space-y-2">
+            <div className={styles.choices}>
               {options.map((opt, i) => (
-                <button
+                <OptionRow
                   key={i}
+                  label={opt}
+                  letter={String.fromCharCode(65 + i)}
+                  selected={selected === opt}
                   onClick={() => !result && setSelected(opt)}
                   disabled={!!result}
-                  className={cn(
-                    "w-full text-left px-4 py-3 rounded-lg border text-sm transition-all",
+                  state={
                     result
                       ? result.correctAnswer != null && opt === String(result.correctAnswer)
-                        ? "bg-green-50 border-green-500 text-green-800"
+                        ? "correct"
                         : opt === selected
-                        ? "bg-red-50 border-red-400 text-red-700"
-                        : "border-input opacity-60"
-                      : selected === opt
-                      ? "bg-[var(--brand)]/10 border-[var(--brand)] text-[var(--brand)]"
-                      : "border-input hover:border-[var(--brand)] hover:bg-muted"
-                  )}
-                >
-                  <span className="font-medium mr-2">{String.fromCharCode(65 + i)}.</span>
-                  {opt}
-                </button>
+                          ? "incorrect"
+                          : "muted"
+                      : undefined
+                  }
+                />
               ))}
             </div>
           )}
 
           {exercise.type === "FILL_IN_BLANK" && (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Complete a frase:</p>
+            <div className={styles.field}>
+              <label htmlFor="practice-answer" className="text-sm text-muted-foreground">
+                Complete a frase:
+              </label>
               <input
+                id="practice-answer"
                 value={selected ?? ""}
                 onChange={(e) => !result && setSelected(e.target.value)}
                 disabled={!!result}
@@ -225,41 +225,42 @@ export default function ExercisesPage() {
           )}
 
           {exercise.type === "TRUE_FALSE" && (
-            <div className="flex gap-4">
+            <div className={styles.binary}>
               {["True", "False"].map((opt) => (
-                <button
+                <OptionRow
                   key={opt}
+                  label={opt}
+                  selected={selected === opt}
+                  grow
                   onClick={() => !result && setSelected(opt)}
                   disabled={!!result}
-                  className={cn(
-                    "flex-1 py-3 rounded-lg border text-sm font-medium transition-all",
+                  state={
                     result
                       ? result.correctAnswer != null && String(result.correctAnswer).toLowerCase() === opt.toLowerCase()
-                        ? "bg-green-50 border-green-500 text-green-800"
+                        ? "correct"
                         : selected?.toLowerCase() === opt.toLowerCase()
-                        ? "bg-red-50 border-red-400"
-                        : "opacity-60 border-input"
-                      : selected === opt
-                      ? "bg-[var(--brand)] text-white border-[var(--brand)]"
-                      : "border-input hover:border-[var(--brand)]"
-                  )}
-                >
-                  {opt}
-                </button>
+                          ? "incorrect"
+                          : "muted"
+                      : undefined
+                  }
+                />
               ))}
             </div>
           )}
 
           {/* Result feedback */}
           {result && (
-            <div className={cn(
-              "rounded-lg p-4 flex items-start gap-3",
-              result.isCorrect ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"
-            )}>
-              {result.isCorrect
-                ? <CheckCircle className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
-                : <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-              }
+            <div
+              className={cn(
+                styles.feedback,
+                result.isCorrect ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"
+              )}
+            >
+              {result.isCorrect ? (
+                <CheckCircle className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+              ) : (
+                <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+              )}
               <div>
                 <p className={cn("font-medium text-sm", result.isCorrect ? "text-green-800" : "text-red-800")}>
                   {result.isCorrect ? `Correct! +${result.score} points` : "Not quite right."}
@@ -269,20 +270,14 @@ export default function ExercisesPage() {
                     Correct answer: <strong>{String(result.correctAnswer)}</strong>
                   </p>
                 )}
-                {result.explanation && (
-                  <p className="text-sm text-muted-foreground mt-2">{result.explanation}</p>
-                )}
+                {result.explanation && <p className="text-sm text-muted-foreground mt-2">{result.explanation}</p>}
               </div>
             </div>
           )}
 
-          <div className="flex gap-3 pt-2">
+          <div className={styles.actions}>
             {!result ? (
-              <Button
-                onClick={submitAnswer}
-                disabled={!selected || submitting}
-                className="flex-1"
-              >
+              <Button onClick={submitAnswer} disabled={!selected || submitting} className="flex-1">
                 {submitting ? "Checking..." : "Submit Answer"}
               </Button>
             ) : (

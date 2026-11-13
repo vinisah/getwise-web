@@ -6,6 +6,7 @@ import { studentFrequency } from "@/lib/services/attendance";
 import { Card, Badge } from "@/components/gw/primitives";
 import { formatDateTime, safeHttpUrl } from "@/lib/utils";
 import { Calendar, Video, Clock } from "lucide-react";
+import styles from "./lessons.module.css";
 
 const STATUS: Record<string, { label: string; tone: string }> = {
   SCHEDULED: { label: "Agendada", tone: "blue" },
@@ -41,7 +42,7 @@ export default async function StudentLessonsPage() {
     const st = STATUS[l.status] ?? STATUS.SCHEDULED;
     const att = l.bookings[0]?.attendance;
     return (
-      <div key={l.id} className="gw-row">
+      <div key={l.id} className={`gw-row ${styles.row}`}>
         <div
           style={{
             width: 44,
@@ -59,13 +60,11 @@ export default async function StudentLessonsPage() {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
+            className={styles.title}
             style={{
               fontSize: 13.5,
               fontWeight: 600,
               color: "var(--ink)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
             }}
           >
             {l.title}
@@ -75,18 +74,9 @@ export default async function StudentLessonsPage() {
             {l.duration}min
           </div>
         </div>
-        <div
-          style={{
-            textAlign: "right",
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            gap: 4,
-          }}
-        >
+        <div className={styles.details}>
           <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink)" }}>{formatDateTime(l.scheduledAt)}</span>
-          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className={styles.status}>
             {safeHttpUrl(l.meetingUrl) && l.status === "SCHEDULED" && (
               <a
                 href={safeHttpUrl(l.meetingUrl)}
