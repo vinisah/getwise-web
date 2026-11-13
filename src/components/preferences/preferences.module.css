@@ -272,7 +272,7 @@
   margin-bottom: 20px;
   background: var(--panel);
 }
-.dialog {
+.dialog[open] {
   padding: 24px;
   max-width: min(480px, calc(100vw - 32px));
 }
