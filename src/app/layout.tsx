@@ -38,7 +38,7 @@ export default async function RootLayout({
   const style = themeVars(prefs) as React.CSSProperties;
 
   return (
-    <html lang="pt-BR" className={`${hanken.variable} ${spline.variable}`} style={style}>
+    <html lang="pt-BR" data-motion={prefs.motion} className={`${hanken.variable} ${spline.variable}`} style={style}>
       <body>
         <Providers>{children}</Providers>
       </body>

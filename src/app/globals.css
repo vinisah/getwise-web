@@ -37,6 +37,10 @@
   --r: 16px;
   --r-sm: 10px;
   --r-lg: 22px;
+  --scroll-thumb: #cfd5e6;
+  --scroll-thumb-hover: #b9c1da;
+  --scroll-thumb-active: #646d96;
+  --scroll-track: var(--bg);
 }
 
 @theme inline {
@@ -102,17 +106,41 @@ a {
 }
 
 /* scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cfd5e6;
+  background: var(--scroll-thumb);
   border-radius: 99px;
   border: 3px solid var(--bg);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #b9c1da;
+  background: var(--scroll-thumb-hover);
+}
+::-webkit-scrollbar-thumb:active {
+  background: var(--scroll-thumb-active);
+}
+::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+}
+@media (forced-colors: active) {
+  * {
+    scrollbar-color: auto;
+  }
+}
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 .gw-root {
@@ -153,7 +181,7 @@ a {
   overflow-x: hidden;
 }
 .gw-nav-list::-webkit-scrollbar {
-  width: 0;
+  width: 6px;
 }
 .gw-nav-section {
   font-family: var(--mono);
@@ -1044,7 +1072,16 @@ a {
 }
 
 @media (max-width: 700px) {
-  .gw-topbar { flex-wrap: wrap; gap: 12px; }
-  .gw-topbar > div { width: 100%; min-width: 0; }
-  .gw-topbar > div:last-child { flex-wrap: wrap; gap: 8px !important; }
+  .gw-topbar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .gw-topbar > div {
+    width: 100%;
+    min-width: 0;
+  }
+  .gw-topbar > div:last-child {
+    flex-wrap: wrap;
+    gap: 8px !important;
+  }
 }

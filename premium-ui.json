@@ -1,0 +1,16 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["src/components/preferences", "src/app/(dashboard)/student/settings", "src/app/api/me/prefs"],
+  "locale": "pt-BR",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": ["Form", "Scrollbar", "CRUD"],
+  "requiredCommands": ["unit", "typecheck"],
+  "commands": {
+    "unit": "node node_modules/vitest/vitest.mjs run src/test/integration/preferences.test.ts src/test/unit/preferences-editor.test.tsx --maxWorkers=2",
+    "typecheck": "node node_modules/typescript/bin/tsc --noEmit"
+  },
+  "evidence": {
+    "crudFullFlow": "src/test/unit/preferences-editor.test.tsx",
+    "failurePaths": "src/test/integration/preferences.test.ts"
+  }
+}

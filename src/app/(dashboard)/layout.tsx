@@ -3,6 +3,9 @@ import { Sidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
 import { MobileNavProvider } from "@/components/dashboard/mobile-nav";
 import { getCachedSession, getEffectiveUser } from "@/lib/effective-user";
+import { prisma } from "@/lib/prisma";
+import { normalizePrefs } from "@/lib/theme";
+import { PreferencesProvider } from "@/components/preferences/preferences-provider";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getCachedSession();
@@ -17,16 +20,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const eff = await getEffectiveUser();
   const previewRole = eff?.isPreview ? eff.role : undefined;
   const previewName = eff?.isPreview ? eff.name : undefined;
+  const ownAccount = await prisma.user.findUnique({ where: { id: session.user.id }, select: { uiPrefs: true } });
 
   return (
-    <MobileNavProvider>
-      <div className="gw-app">
-        <Sidebar previewRole={previewRole} previewName={previewName} />
-        <main className="gw-main">
-          <Topbar previewRole={previewRole} />
-          <div className="gw-content">{children}</div>
-        </main>
-      </div>
-    </MobileNavProvider>
+    <PreferencesProvider key={session.user.id} initialPrefs={normalizePrefs(ownAccount?.uiPrefs)}>
+      <MobileNavProvider>
+        <div className="gw-app">
+          <Sidebar previewRole={previewRole} previewName={previewName} />
+          <main className="gw-main">
+            <Topbar previewRole={previewRole} />
+            <div className="gw-content">{children}</div>
+          </main>
+        </div>
+      </MobileNavProvider>
+    </PreferencesProvider>
   );
 }

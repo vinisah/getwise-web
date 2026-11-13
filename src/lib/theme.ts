@@ -14,6 +14,9 @@ export interface UiPrefs {
   density: DensityId;
   radius: number; // 10 | 16 | 22
   sidebar: SidebarId;
+  nickname: string;
+  motion: "system" | "reduced";
+  tutorPace: "calm" | "quick" | "instant";
 }
 
 export const DEFAULT_PREFS: UiPrefs = {
@@ -22,6 +25,9 @@ export const DEFAULT_PREFS: UiPrefs = {
   density: "espacoso",
   radius: 16,
   sidebar: "gradiente",
+  nickname: "",
+  motion: "system",
+  tutorPace: "calm",
 };
 
 export const PREFS_COOKIE = "gw_ui";
@@ -126,10 +132,16 @@ export function normalizePrefs(raw: unknown): UiPrefs {
   const sidebar: SidebarId = p.sidebar === "solida" ? "solida" : "gradiente";
   const radius = RADIUS_CHOICES.includes(p.radius as 10) ? (p.radius as number) : DEFAULT_PREFS.radius;
   const accent =
-    p.accent === "auto" || (typeof p.accent === "string" && /^#[0-9a-fA-F]{6}$/.test(p.accent))
-      ? p.accent
+    typeof p.accent === "string" && ACCENT_CHOICES.some((c) => c.toLowerCase() === p.accent!.toLowerCase())
+      ? p.accent.toUpperCase().replace("AUTO", "auto")
       : DEFAULT_PREFS.accent;
-  return { theme, accent, density, radius, sidebar };
+  const nickname =
+    typeof p.nickname === "string" && p.nickname.trim().length <= 30 && !/[<>\p{Cc}\p{Cf}]/u.test(p.nickname)
+      ? p.nickname.trim()
+      : "";
+  const motion = p.motion === "reduced" ? "reduced" : "system";
+  const tutorPace = p.tutorPace === "quick" || p.tutorPace === "instant" ? p.tutorPace : "calm";
+  return { theme, accent, density, radius, sidebar, nickname, motion, tutorPace };
 }
 
 /** Gera o mapa de CSS vars (chave → valor) para aplicar inline no <html>. */
