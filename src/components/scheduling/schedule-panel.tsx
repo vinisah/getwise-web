@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./schedule.module.css";
 
 type Lesson = {
@@ -8,6 +8,7 @@ type Lesson = {
   scheduledAt: string;
   level: string;
   maxStudents: number;
+  status: string;
   teacher: { name: string };
   _count?: { bookings: number };
 };
@@ -18,6 +19,8 @@ type Schedule = {
   available: Lesson[];
 };
 type AdminData = {
+  canAssign: boolean;
+  canPreview: boolean;
   cohorts: {
     id: string;
     name: string;
@@ -45,17 +48,55 @@ export function SchedulePanel({ admin = false }: { admin?: boolean }) {
   const [selected, setSelected] = useState<Booking | null>(null);
   const [reason, setReason] = useState("");
   const [day, setDay] = useState("");
-  async function load() {
-    const response = await fetch("/api/scheduling" + (admin ? "?admin=true" : ""));
-    const result = await response.json();
+  const inFlight = useRef(false);
+  const loadVersion = useRef(0);
+  const load = useCallback(async () => {
+    const version = ++loadVersion.current;
+    const response = await fetch("/api/scheduling" + (admin ? "?admin=true" : ""), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+    });
+    const result = await response.json().catch(() => {
+      throw new Error("Não foi possível ler a agenda. Tente atualizar novamente.");
+    });
     if (!response.ok) throw new Error(result.error || "Não foi possível carregar a agenda");
-    if (admin) setManagement(result);
-    else setData(result);
-  }
+    if (version === loadVersion.current) {
+      if (admin) setManagement(result);
+      else {
+        setData(result);
+        setSelected((current) =>
+          current
+            ? (result.bookings.find(
+                (b: Booking) =>
+                  b.id === current.id && b.confirmation !== "RESCHEDULED" && b.lesson.status === "SCHEDULED"
+              ) ?? null)
+            : null
+        );
+      }
+    }
+    return result as Schedule & AdminData;
+  }, [admin]);
   useEffect(() => {
     load().catch((error) => setMessage(error.message));
-  }, [admin]);
+    const refresh = () => {
+      if (!inFlight.current && document.visibilityState === "visible") {
+        void load().catch(() =>
+          setMessage("Não foi possível atualizar a agenda. Confira sua conexão e tente novamente.")
+        );
+      }
+    };
+    const interval = setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      ++loadVersion.current;
+    };
+  }, [load]);
   async function act(body: object) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    ++loadVersion.current;
     setBusy(true);
     setMessage("");
     try {
@@ -63,22 +104,67 @@ export function SchedulePanel({ admin = false }: { admin?: boolean }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(25000),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Não foi possível salvar");
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        // A última vaga pode ter sido ocupada depois da listagem.
+        await load().catch(() => {});
+        throw new Error(result?.error || "Não foi possível salvar. Atualize a agenda antes de tentar novamente.");
+      }
       if ("action" in body && body.action === "preview") {
         window.location.assign("/student/agenda");
         return;
       }
-      await load();
-      setMessage("Agenda atualizada.");
+      // Reflete a gravação confirmada mesmo se a consulta seguinte perder a conexão.
+      if ("action" in body && "bookingId" in body) {
+        const action = body.action;
+        setData((current) =>
+          current
+            ? {
+                ...current,
+                bookings: current.bookings.map((booking) =>
+                  booking.id !== body.bookingId
+                    ? booking
+                    : {
+                        ...booking,
+                        status: action === "confirm" ? "SCHEDULED" : "CANCELLED",
+                        confirmation:
+                          action === "confirm" ? "CONFIRMED" : action === "decline" ? "DECLINED" : "RESCHEDULED",
+                        absenceReason:
+                          action === "confirm" ? null : action === "decline" ? reason : booking.absenceReason,
+                      }
+                ),
+              }
+            : current
+        );
+      }
+      if ("lessonId" in body)
+        setData((current) =>
+          current
+            ? { ...current, available: current.available.filter((lesson) => lesson.id !== body.lessonId) }
+            : current
+        );
       if ("action" in body && body.action === "decline" && selected)
-        setSelected({ ...selected, confirmation: "DECLINED" });
+        setSelected({ ...selected, status: "CANCELLED", confirmation: "DECLINED", absenceReason: reason });
       else setSelected(null);
       setReason("");
+      try {
+        await load();
+        setMessage("Agenda atualizada.");
+      } catch {
+        setMessage(
+          "Alteração salva. Não foi possível recarregar a agenda; clique em Atualizar agenda. Não é necessário repetir a operação."
+        );
+      }
     } catch (error) {
-      setMessage((error as Error).message);
+      setMessage(
+        error instanceof Error && !["TypeError", "TimeoutError", "AbortError"].includes(error.name)
+          ? error.message
+          : "Falha de conexão. Atualize a agenda para conferir se a alteração foi salva antes de tentar novamente."
+      );
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
@@ -98,6 +184,17 @@ export function SchedulePanel({ admin = false }: { admin?: boolean }) {
             : "Confirme sua participação ou escolha outro encontro do seu nível."}
         </p>
       </header>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          void load()
+            .then(() => setMessage("Agenda atualizada."))
+            .catch((error) => setMessage(error.message));
+        }}
+      >
+        Atualizar agenda
+      </button>
       {message && (
         <p role="status" className={styles.notice}>
           {message}
@@ -112,7 +209,7 @@ export function SchedulePanel({ admin = false }: { admin?: boolean }) {
               const fields = Object.fromEntries(new FormData(event.currentTarget));
               void act({
                 ...fields,
-                startsAt: new Date(String(fields.startsAt) + "-03:00").toISOString(),
+                startsAt: String(fields.startsAt) + "-03:00",
                 action: "createCohort",
               });
             }}
@@ -184,17 +281,21 @@ export function SchedulePanel({ admin = false }: { admin?: boolean }) {
                 </span>
                 {student.studentProfile?.cohortId ? (
                   <span>{management.cohorts.find((c) => c.id === student.studentProfile?.cohortId)?.name}</span>
-                ) : (
+                ) : management.canAssign ? (
                   <button
                     disabled={busy || !student.studentProfile}
                     onClick={() => act({ action: "assign", studentId: student.id })}
                   >
                     Alocar em turma do mesmo nível
                   </button>
+                ) : (
+                  <span>Aguardando alocação pela equipe autorizada</span>
                 )}
-                <button disabled={busy} onClick={() => act({ action: "preview", studentId: student.id })}>
-                  Ver agenda do aluno
-                </button>
+                {management.canPreview && (
+                  <button disabled={busy} onClick={() => act({ action: "preview", studentId: student.id })}>
+                    Ver agenda do aluno
+                  </button>
+                )}
               </div>
             ))}
           </section>
@@ -221,30 +322,41 @@ export function SchedulePanel({ admin = false }: { admin?: boolean }) {
             {data.bookings.map((booking) => (
               <article className={styles.card} key={booking.id}>
                 <span>
-                  {booking.lesson.level} · {labels[booking.confirmation]}
+                  {booking.lesson.level} ·{" "}
+                  {booking.lesson.status === "CANCELLED"
+                    ? "Aula cancelada pela escola"
+                    : booking.lesson.status === "COMPLETED"
+                      ? "Aula concluída"
+                      : booking.lesson.status === "IN_PROGRESS"
+                        ? "Aula em andamento"
+                        : labels[booking.confirmation]}
                 </span>
                 <h2>{booking.lesson.title}</h2>
                 <p>{format(booking.lesson.scheduledAt)}</p>
                 <p>Mentor · {booking.lesson.teacher.name}</p>
                 {booking.absenceReason && <p>Justificativa · {booking.absenceReason}</p>}
-                {booking.confirmation !== "RESCHEDULED" && (
-                  <div className={styles.actions}>
-                    {booking.confirmation !== "CONFIRMED" && (
-                      <button disabled={busy} onClick={() => act({ action: "confirm", bookingId: booking.id })}>
-                        Confirmar participação
+                {booking.confirmation !== "RESCHEDULED" &&
+                  booking.lesson.status === "SCHEDULED" &&
+                  new Date(booking.lesson.scheduledAt).getTime() > Date.now() && (
+                    <div className={styles.actions}>
+                      {booking.confirmation !== "CONFIRMED" && (
+                        <button disabled={busy} onClick={() => act({ action: "confirm", bookingId: booking.id })}>
+                          Confirmar participação
+                        </button>
+                      )}
+                      <button
+                        disabled={busy}
+                        onClick={() => {
+                          setSelected(booking);
+                          setReason("");
+                          setDay("");
+                          setMessage("");
+                        }}
+                      >
+                        {booking.confirmation === "DECLINED" ? "Escolher outro horário" : "Não posso participar"}
                       </button>
-                    )}
-                    <button
-                      disabled={busy}
-                      onClick={() => {
-                        setSelected(booking);
-                        setReason("");
-                      }}
-                    >
-                      {booking.confirmation === "DECLINED" ? "Escolher outro horário" : "Não posso participar"}
-                    </button>
-                  </div>
-                )}
+                    </div>
+                  )}
               </article>
             ))}
           </div>
@@ -271,13 +383,23 @@ export function SchedulePanel({ admin = false }: { admin?: boolean }) {
               ref={(node) => {
                 if (node && !node.open) node.showModal();
               }}
-              onCancel={() => setSelected(null)}
+              onCancel={(event) => {
+                if (busy) event.preventDefault();
+                else setSelected(null);
+              }}
               aria-label="Remarcar aula"
             >
               <div className={styles.row}>
                 <h2>Remarcar encontro</h2>
-                <button onClick={() => setSelected(null)}>Fechar</button>
+                <button disabled={busy} onClick={() => setSelected(null)}>
+                  Fechar
+                </button>
               </div>
+              {message && (
+                <p role="status" className={styles.notice}>
+                  {message}
+                </p>
+              )}
               {selected.confirmation !== "DECLINED" ? (
                 <form
                   onSubmit={(event) => {
@@ -292,6 +414,7 @@ export function SchedulePanel({ admin = false }: { admin?: boolean }) {
                       minLength={2}
                       maxLength={1000}
                       value={reason}
+                      disabled={busy}
                       onChange={(event) => setReason(event.target.value)}
                     />
                   </label>

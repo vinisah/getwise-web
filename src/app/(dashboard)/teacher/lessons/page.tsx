@@ -6,6 +6,7 @@ import { Card, Badge } from "@/components/gw/primitives";
 import { formatDateTime, safeHttpUrl } from "@/lib/utils";
 import { Headphones } from "lucide-react";
 import { AttendanceForm } from "./attendance-form";
+import { AgendaRefresh } from "@/components/scheduling/agenda-refresh";
 
 const STATUS: Record<string, { label: string; tone: string }> = {
   SCHEDULED: { label: "Agendada", tone: "blue" },
@@ -21,14 +22,15 @@ export default async function TeacherLessonsPage() {
 
   const lessons = await prisma.lesson.findMany({
     where: { teacherId: eff.id },
-    include: { bookings: { where: { status: { not: "CANCELLED" } }, include: { student: { select: { id: true, name: true } } } } },
+    include: { bookings: { include: { student: { select: { id: true, name: true } } } } },
     orderBy: { scheduledAt: "desc" },
   });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--gap)" }}>
+      <AgendaRefresh />
       <p style={{ fontSize: 13.5, color: "var(--muted)" }}>
-        Suas aulas. Marque presença e avaliação por aluno nas turmas com alunos.
+        Acompanhe confirmações, ausências e remarcações. Marque a presença dos participantes de cada aula.
       </p>
 
       {lessons.length === 0 ? (
@@ -36,6 +38,10 @@ export default async function TeacherLessonsPage() {
       ) : (
         lessons.map((l) => {
           const st = STATUS[l.status] ?? STATUS.SCHEDULED;
+          const active = l.bookings.filter((b) => b.status !== "CANCELLED");
+          const declined = l.bookings.filter(
+            (b) => b.status === "CANCELLED" && ["DECLINED", "RESCHEDULED"].includes(b.confirmation)
+          );
           return (
             <Card key={l.id}>
               <div
@@ -55,7 +61,7 @@ export default async function TeacherLessonsPage() {
                     </Badge>
                   </div>
                   <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3 }}>
-                    {formatDateTime(l.scheduledAt)} · {l.bookings.length}/{l.maxStudents} alunos ·{" "}
+                    {formatDateTime(l.scheduledAt)} · {active.length}/{l.maxStudents} alunos ·{" "}
                     {l.meetingUrl ? "Online" : "Presencial"}
                   </div>
                 </div>
@@ -83,11 +89,27 @@ export default async function TeacherLessonsPage() {
                 )}
               </div>
 
-              {l.status !== "CANCELLED" && l.bookings.length > 0 && (
+              {active.length > 0 && (
+                <p style={{ marginTop: 12, fontSize: 13 }}>
+                  {active.filter((b) => b.confirmation === "CONFIRMED").length} participação(ões) confirmada(s)
+                </p>
+              )}
+              {declined.length > 0 && (
+                <details style={{ marginTop: 12, fontSize: 13 }}>
+                  <summary>Ausências e remarcações ({declined.length})</summary>
+                  {declined.map((b) => (
+                    <p key={b.id}>
+                      {b.student.name} · {b.confirmation === "RESCHEDULED" ? "Remarcou a aula" : "Justificou ausência"}
+                      {b.absenceReason ? ` · ${b.absenceReason}` : ""}
+                    </p>
+                  ))}
+                </details>
+              )}
+              {l.status !== "CANCELLED" && active.length > 0 && (
                 <div style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
                   <AttendanceForm
                     lessonId={l.id}
-                    students={l.bookings.map((b) => ({
+                    students={active.map((b) => ({
                       studentId: b.studentId,
                       name: b.student.name,
                       attendance: b.attendance,
