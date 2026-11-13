@@ -33,7 +33,13 @@ export default async function CertificatesPage() {
           </p>
         </Card>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))", gap: "var(--gap)" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,320px),1fr))",
+            gap: "var(--gap)",
+          }}
+        >
           {certificates.map((cert) => (
             <Card
               key={cert.id}

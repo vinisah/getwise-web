@@ -43,7 +43,20 @@ export function RoleSwitcher({ current }: { current: string }) {
   }
 
   return (
-    <div style={{ position: "relative", display: "inline-flex" }}>
+    <div className="gw-role-switcher">
+      <select
+        className="gw-role-select"
+        aria-label="Visualizar como"
+        value={current}
+        disabled={busy}
+        onChange={(event) => void pick(event.target.value)}
+      >
+        {OPTS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
       <div className="gw-seg-group" role="tablist" aria-label="Visualizar como">
         {OPTS.map((o) => (
           <button
@@ -60,19 +73,7 @@ export function RoleSwitcher({ current }: { current: string }) {
         ))}
       </div>
       {err && (
-        <span
-          role="status"
-          aria-live="polite"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            right: 0,
-            whiteSpace: "nowrap",
-            fontSize: 11.5,
-            fontWeight: 600,
-            color: "var(--danger)",
-          }}
-        >
+        <span role="status" aria-live="polite" className="gw-role-error">
           {err}
         </span>
       )}

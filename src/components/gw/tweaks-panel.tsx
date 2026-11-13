@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Settings, X } from "lucide-react";
+import { AppDialog } from "@/components/ui/app-dialog";
 import {
   ACCENT_CHOICES,
   DEFAULT_PREFS,
@@ -133,114 +134,96 @@ export function TweaksPanel() {
 
   return (
     <>
-      <button className="gw-icon-btn" aria-label="Aparência" title="Aparência" onClick={() => setOpen(true)}>
+      <button
+        className="gw-icon-btn"
+        aria-label="Aparência"
+        title="Aparência"
+        onClick={(event) => {
+          event.currentTarget.focus({ preventScroll: true });
+          setOpen(true);
+        }}
+      >
         <Settings size={18} />
       </button>
 
-      {open && (
-        <>
-          <div
-            onClick={() => setOpen(false)}
-            style={{ position: "fixed", inset: 0, background: "rgba(16,22,48,.4)", zIndex: 70 }}
-          />
-          <aside
-            role="dialog"
-            aria-label="Aparência"
-            style={{
-              position: "fixed",
-              top: 0,
-              right: 0,
-              height: "100dvh",
-              width: 320,
-              zIndex: 71,
-              background: "var(--card)",
-              borderLeft: "1px solid var(--line)",
-              boxShadow: "0 20px 60px rgba(16,22,48,.3)",
-              padding: 20,
-              overflowY: "auto",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <h2 style={{ fontSize: 16, fontWeight: 800, color: "var(--ink)" }}>Aparência</h2>
-              <button className="gw-icon-btn sm" aria-label="Fechar" onClick={() => setOpen(false)}>
-                <X size={16} />
-              </button>
-            </div>
+      <AppDialog open={open} onClose={() => setOpen(false)} label="Aparência" placement="drawer">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h2 style={{ fontSize: 16, fontWeight: 800, color: "var(--ink)" }}>Aparência</h2>
+          <button className="gw-icon-btn sm" aria-label="Fechar" onClick={() => setOpen(false)}>
+            <X size={16} />
+          </button>
+        </div>
 
-            <Label>Tema</Label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-              {(Object.keys(THEMES) as ThemeId[]).map((id) => (
-                <button
-                  key={id}
-                  onClick={() => update({ theme: id })}
-                  style={{
-                    cursor: "pointer",
-                    borderRadius: 12,
-                    padding: 6,
-                    textAlign: "center",
-                    border: `2px solid ${prefs.theme === id ? "var(--accent)" : "var(--line)"}`,
-                    background: "var(--card)",
-                  }}
-                >
-                  <div style={{ height: 34, borderRadius: 8, background: THEMES[id].sidebar }} />
-                  <span
-                    style={{ fontSize: 10.5, fontWeight: 600, color: "var(--ink-2)", display: "block", marginTop: 5 }}
-                  >
-                    {id === "marinho" ? "Marinho" : id === "royal" ? "Royal" : "Premium"}
-                  </span>
-                </button>
-              ))}
-            </div>
+        <Label>Tema</Label>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          {(Object.keys(THEMES) as ThemeId[]).map((id) => (
+            <button
+              key={id}
+              onClick={() => update({ theme: id })}
+              style={{
+                cursor: "pointer",
+                borderRadius: 12,
+                padding: 6,
+                textAlign: "center",
+                border: `2px solid ${prefs.theme === id ? "var(--accent)" : "var(--line)"}`,
+                background: "var(--card)",
+              }}
+            >
+              <div style={{ height: 34, borderRadius: 8, background: THEMES[id].sidebar }} />
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: "var(--ink-2)", display: "block", marginTop: 5 }}>
+                {id === "marinho" ? "Marinho" : id === "royal" ? "Royal" : "Premium"}
+              </span>
+            </button>
+          ))}
+        </div>
 
-            <Label>Cor de destaque</Label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {ACCENT_CHOICES.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => update({ accent: c })}
-                  aria-label={c === "auto" ? "Automático" : c}
-                  title={c === "auto" ? "Automático" : c}
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 999,
-                    cursor: "pointer",
-                    border: `2px solid ${prefs.accent === c ? "var(--ink)" : "var(--line)"}`,
-                    background: c === "auto" ? "conic-gradient(from 0deg,#2A5CD6,#6A53CC,#D2382B,#2A5CD6)" : c,
-                  }}
-                />
-              ))}
-            </div>
-
-            <Label>Densidade</Label>
-            <Seg
-              value={prefs.density}
-              onPick={(v) => update({ density: v as UiPrefs["density"] })}
-              options={[
-                { v: "espacoso", label: "Espaçoso" },
-                { v: "compacto", label: "Compacto" },
-              ]}
+        <Label>Cor de destaque</Label>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {ACCENT_CHOICES.map((c) => (
+            <button
+              key={c}
+              onClick={() => update({ accent: c })}
+              aria-label={c === "auto" ? "Automático" : c}
+              title={c === "auto" ? "Automático" : c}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 999,
+                cursor: "pointer",
+                border: `2px solid ${prefs.accent === c ? "var(--ink)" : "var(--line)"}`,
+                background: c === "auto" ? "conic-gradient(from 0deg,#2A5CD6,#6A53CC,#D2382B,#2A5CD6)" : c,
+              }}
             />
+          ))}
+        </div>
 
-            <Label>Cantos</Label>
-            <Seg
-              value={prefs.radius}
-              onPick={(v) => update({ radius: Number(v) })}
-              options={RADIUS_CHOICES.map((r) => ({ v: r, label: String(r) }))}
-            />
+        <Label>Densidade</Label>
+        <Seg
+          value={prefs.density}
+          onPick={(v) => update({ density: v as UiPrefs["density"] })}
+          options={[
+            { v: "espacoso", label: "Espaçoso" },
+            { v: "compacto", label: "Compacto" },
+          ]}
+        />
 
-            <Label>Sidebar</Label>
-            <Seg
-              value={prefs.sidebar}
-              onPick={(v) => update({ sidebar: v as UiPrefs["sidebar"] })}
-              options={[
-                { v: "gradiente", label: "Gradiente" },
-                { v: "solida", label: "Sólida" },
-              ]}
-            />
-          </aside>
-        </>
-      )}
+        <Label>Cantos</Label>
+        <Seg
+          value={prefs.radius}
+          onPick={(v) => update({ radius: Number(v) })}
+          options={RADIUS_CHOICES.map((r) => ({ v: r, label: String(r) }))}
+        />
+
+        <Label>Sidebar</Label>
+        <Seg
+          value={prefs.sidebar}
+          onPick={(v) => update({ sidebar: v as UiPrefs["sidebar"] })}
+          options={[
+            { v: "gradiente", label: "Gradiente" },
+            { v: "solida", label: "Sólida" },
+          ]}
+        />
+      </AppDialog>
     </>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Bell } from "lucide-react";
+import { Bell, X } from "lucide-react";
+import { AppDialog } from "@/components/ui/app-dialog";
 
 type Notif = {
   id: string;
@@ -20,6 +21,7 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -35,15 +37,6 @@ export function NotificationBell() {
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
 
   async function markAll() {
     setUnread(0);
@@ -72,10 +65,15 @@ export function NotificationBell() {
   return (
     <div style={{ position: "relative" }}>
       <button
+        ref={triggerRef}
+        type="button"
         className="gw-icon-btn"
         title="Notificações"
         aria-label={`Notificações${unread > 0 ? ` (${unread} não lidas)` : ""}`}
-        onClick={() => {
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={(event) => {
+          event.currentTarget.focus({ preventScroll: true });
           setOpen((o) => !o);
           if (!open) load();
         }}
@@ -83,86 +81,78 @@ export function NotificationBell() {
         <Bell size={19} />
         {unread > 0 && <span className="gw-badge-dot" />}
       </button>
-      {open && (
-        <>
-          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
-          <div
-            role="dialog"
-            aria-label="Notificações"
-            style={{
-              position: "absolute",
-              right: 0,
-              top: "calc(100% + 8px)",
-              width: 340,
-              maxHeight: 420,
-              overflowY: "auto",
-              zIndex: 61,
-              background: "var(--card)",
-              border: "1px solid var(--line)",
-              borderRadius: "var(--r)",
-              boxShadow: "0 18px 44px -20px rgba(16,22,48,.4)",
-            }}
-          >
-            <div
+      <AppDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        label="Notificações"
+        placement="notifications"
+        anchorRef={triggerRef}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+            padding: "12px 14px",
+            borderBottom: "1px solid var(--line)",
+            position: "sticky",
+            top: 0,
+            background: "var(--card)",
+          }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>Notificações</span>
+          {unread > 0 && (
+            <button
+              onClick={markAll}
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "12px 14px",
-                borderBottom: "1px solid var(--line)",
-                position: "sticky",
-                top: 0,
-                background: "var(--card)",
+                border: "none",
+                background: "transparent",
+                color: "var(--accent)",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
               }}
             >
-              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>Notificações</span>
-              {unread > 0 && (
-                <button
-                  onClick={markAll}
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    color: "var(--accent)",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Marcar todas
-                </button>
-              )}
-            </div>
-            {items.length === 0 ? (
-              <p style={{ fontSize: 13, color: "var(--muted)", padding: "20px 14px", textAlign: "center" }}>
-                Sem notificações.
-              </p>
-            ) : (
-              items.map((n) => (
-                <button
-                  key={n.id}
-                  onClick={() => openItem(n)}
-                  className="gw-cmd-item"
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    border: "none",
-                    borderBottom: "1px solid var(--line)",
-                    background: n.readAt ? "transparent" : "var(--accent-soft)",
-                    cursor: "pointer",
-                    padding: "11px 14px",
-                  }}
-                >
-                  <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
-                    {n.title}
-                  </span>
-                  <span style={{ display: "block", fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{n.body}</span>
-                </button>
-              ))
-            )}
-          </div>
-        </>
-      )}
+              Marcar todas
+            </button>
+          )}
+          <button
+            type="button"
+            className="gw-icon-btn sm"
+            aria-label="Fechar notificações"
+            onClick={() => setOpen(false)}
+          >
+            <X size={18} />
+          </button>
+        </div>
+        {items.length === 0 ? (
+          <p style={{ fontSize: 13, color: "var(--muted)", padding: "20px 14px", textAlign: "center" }}>
+            Sem notificações.
+          </p>
+        ) : (
+          items.map((n) => (
+            <button
+              key={n.id}
+              onClick={() => openItem(n)}
+              className="gw-cmd-item"
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                border: "none",
+                borderBottom: "1px solid var(--line)",
+                background: n.readAt ? "transparent" : "var(--accent-soft)",
+                cursor: "pointer",
+                padding: "11px 14px",
+              }}
+            >
+              <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{n.title}</span>
+              <span style={{ display: "block", fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{n.body}</span>
+            </button>
+          ))
+        )}
+      </AppDialog>
     </div>
   );
 }
