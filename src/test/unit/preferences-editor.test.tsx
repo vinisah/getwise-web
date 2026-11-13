@@ -17,6 +17,18 @@ function editor() {
   );
 }
 beforeEach(() => {
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
+    configurable: true,
+    value() {
+      this.setAttribute("open", "");
+    },
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", {
+    configurable: true,
+    value() {
+      this.removeAttribute("open");
+    },
+  });
   vi.stubGlobal(
     "matchMedia",
     vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
@@ -113,3 +125,19 @@ it.each([{ motion: "reduced" as const }, { tutorPace: "instant" as const }])(
     expect(screen.queryByRole("button", { name: "Mostrar tudo agora" })).not.toBeInTheDocument();
   }
 );
+
+it("guards navigation with the shared dialog and preserves the draft when staying", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ prefs: DEFAULT_PREFS, version })));
+  editor();
+  await waitFor(() => expect(screen.getByLabelText("Apelido")).toBeEnabled());
+  fireEvent.change(screen.getByLabelText("Apelido"), { target: { value: "Lia" } });
+  const link = document.createElement("a");
+  link.href = "/student/tutor";
+  document.body.append(link);
+  fireEvent.click(link);
+  expect(screen.getByRole("dialog", { name: "Sair sem salvar?" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Apelido")).toHaveValue("Lia");
+  link.remove();
+});

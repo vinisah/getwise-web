@@ -19,6 +19,7 @@ const TITLES: Record<string, { title: string; sub?: string }> = {
   "/admin/enrollments/new": { title: "Nova Matrícula" },
   "/admin/lessons": { title: "Aulas", sub: "Agenda de aulas" },
   "/admin/lessons/new": { title: "Nova Aula" },
+  "/admin/lessons/turmas": { title: "Turmas e agenda", sub: "Agenda pedagógica e turmas por nível" },
   "/admin/financial": { title: "Financeiro", sub: "Receitas e despesas" },
   "/admin/financial/new": { title: "Nova Transação" },
   "/admin/receivables": { title: "Cobranças", sub: "Contas a receber e inadimplência" },
@@ -34,6 +35,10 @@ const TITLES: Record<string, { title: string; sub?: string }> = {
   "/student": { title: "Olá! 👋", sub: "Portal do aluno" },
   "/student/courses": { title: "Cursos", sub: "Sua trilha de aprendizado" },
   "/student/lessons": { title: "Aulas", sub: "Suas aulas agendadas" },
+  "/student/agenda": {
+    title: "Confirmar aulas",
+    sub: "Confirme sua participação ou escolha outro encontro do seu nível",
+  },
   "/student/exercises": { title: "Exercícios", sub: "Pratique vocabulário e gramática" },
   "/student/tutor": { title: "Tutor de Inglês", sub: "Powered by IA · Pratique a qualquer hora" },
   "/student/settings": { title: "Minhas preferências", sub: "Seu espaço de aprendizado, do seu jeito" },
@@ -57,11 +62,18 @@ export function Topbar({ previewRole }: { previewRole?: string } = {}) {
 
   return (
     <header className="gw-topbar">
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <button className="gw-burger" onClick={() => setOpen(true)} aria-label="Abrir menu">
+      <div className="gw-topbar-heading">
+        <button
+          className="gw-burger"
+          onClick={(event) => {
+            event.currentTarget.focus({ preventScroll: true });
+            setOpen(true);
+          }}
+          aria-label="Abrir menu"
+        >
           <Menu size={22} />
         </button>
-        <div>
+        <div className="gw-topbar-title">
           <Eyebrow>{eyebrow}</Eyebrow>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: "var(--ink)", letterSpacing: "-.025em", marginTop: 3 }}>
             {pathname === "/student" && !previewRole && prefs.nickname ? `Olá, ${prefs.nickname}!` : meta.title}
@@ -70,7 +82,7 @@ export function Topbar({ previewRole }: { previewRole?: string } = {}) {
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div className="gw-topbar-actions">
         <CommandPalette />
         <TweaksPanel />
         <NotificationBell />

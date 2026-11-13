@@ -273,18 +273,8 @@
   background: var(--panel);
 }
 .dialog {
-  margin: auto;
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  background: var(--card);
-  color: var(--ink);
   padding: 24px;
   max-width: min(480px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
-  overflow: auto;
-}
-.dialog::backdrop {
-  background: rgba(16, 22, 48, 0.45);
 }
 .dialog h2 {
   font-size: 20px;

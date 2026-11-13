@@ -257,8 +257,8 @@
 }
 @media (max-width: 600px) {
   .shell {
-    height: calc(100dvh - 180px);
-    min-height: 420px;
+    height: calc(var(--gw-visible-height, 100dvh) - 24px - env(safe-area-inset-bottom));
+    min-height: 260px;
   }
   .header {
     padding: 14px;

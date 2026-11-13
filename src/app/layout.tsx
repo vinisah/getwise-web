@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 // theme-color (chrome do navegador/PWA) acompanha o tema escolhido (mesmo cookie do <html>).
 export async function generateViewport(): Promise<Viewport> {
   const prefs = parsePrefsCookie((await cookies()).get(PREFS_COOKIE)?.value);
-  return { themeColor: THEMES[prefs.theme].brand };
+  return { themeColor: THEMES[prefs.theme].brand, viewportFit: "cover", interactiveWidget: "resizes-content" };
 }
 
 export default async function RootLayout({

@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { AppDialog } from "@/components/ui/app-dialog";
 import styles from "./preferences.module.css";
 
 /** An app-owned dialog for links; the browser owns actual document-unload prompts. */
 export function UnsavedPreferences({ dirty }: { dirty: boolean }) {
-  const dialog = useRef<HTMLDialogElement>(null);
   const [destination, setDestination] = useState<string | null>(null);
   const leaving = useRef(false);
   useEffect(() => {
@@ -30,15 +30,11 @@ export function UnsavedPreferences({ dirty }: { dirty: boolean }) {
       document.removeEventListener("click", onLink, true);
     };
   }, [dirty]);
-  useEffect(() => {
-    if (destination) dialog.current?.showModal();
-  }, [destination]);
   function stay() {
-    dialog.current?.close();
     setDestination(null);
   }
   return (
-    <dialog ref={dialog} className={styles.dialog} aria-labelledby="unsaved-title" onCancel={stay}>
+    <AppDialog open={!!destination} onClose={stay} label="Sair sem salvar?" className={styles.dialog}>
       <h2 id="unsaved-title">Sair sem salvar?</h2>
       <p>
         Suas escolhas ainda não foram salvas. Você pode continuar editando ou sair e manter as preferências anteriores.
@@ -60,6 +56,6 @@ export function UnsavedPreferences({ dirty }: { dirty: boolean }) {
           Sair sem salvar
         </Button>
       </div>
-    </dialog>
+    </AppDialog>
   );
 }

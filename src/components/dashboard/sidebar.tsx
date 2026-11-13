@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { useMobileNav } from "@/components/dashboard/mobile-nav";
 import { usePreferences } from "@/components/preferences/preferences-provider";
 import { cx, getInitials } from "@/lib/utils";
@@ -28,6 +29,7 @@ import {
   BookOpen,
   Award,
   Settings,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -80,8 +82,20 @@ const ROLE_LABEL: Record<string, string> = {
   STUDENT: "Aluno",
 };
 
+const MOBILE_QUERY = "(max-width: 920px)";
+const subscribeViewport = (notify: () => void) => {
+  const query = window.matchMedia(MOBILE_QUERY);
+  query.addEventListener("change", notify);
+  return () => query.removeEventListener("change", notify);
+};
+
 function isActive(pathname: string, href: string) {
   if (href === "/admin" || href === "/student" || href === "/teacher") return pathname === href;
+  if (
+    href === "/admin/lessons" &&
+    (pathname === "/admin/lessons/turmas" || pathname.startsWith("/admin/lessons/turmas/"))
+  )
+    return false;
   return pathname === href || pathname.startsWith(href + "/");
 }
 
@@ -90,6 +104,11 @@ export function Sidebar({ previewRole, previewName }: { previewRole?: string; pr
   const { data: session } = useSession();
   const { open, setOpen } = useMobileNav();
   const { prefs } = usePreferences();
+  const mobile = useSyncExternalStore(
+    subscribeViewport,
+    () => window.matchMedia(MOBILE_QUERY).matches,
+    () => false
+  );
   const user = session?.user as { name?: string; email?: string; role?: string } | undefined;
   // Em "ver como" (admin), o role/nome efetivos vêm do servidor e dirigem a navegação.
   const role = previewRole || user?.role || "STUDENT";
@@ -108,97 +127,103 @@ export function Sidebar({ previewRole, previewName }: { previewRole?: string; pr
     setOpen(false);
   }, [pathname, setOpen]);
 
-  // Acessibilidade do drawer mobile: fecha no Escape.
+  // Voltar ao desktop descarta o estado do drawer; o diálogo cuida do foco e Escape.
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+    const query = window.matchMedia(MOBILE_QUERY);
+    const onResize = () => {
+      if (!query.matches) setOpen(false);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, setOpen]);
+    query.addEventListener("change", onResize);
+    return () => query.removeEventListener("change", onResize);
+  }, [setOpen]);
 
-  return (
+  const content = (
     <>
-      {open && <div className="gw-backdrop" onClick={() => setOpen(false)} />}
-      <aside
-        className={cx("gw-sidebar", open && "gw-open")}
-        aria-label="Navegação principal"
-        role={open ? "dialog" : undefined}
-        aria-modal={open ? true : undefined}
-      >
-        <div className="gw-side-brand">
-          <Logo variant="full" white height={38} />
-        </div>
+      <div className="gw-side-brand">
+        <Logo variant="full" white height={38} />
+        {mobile && (
+          <button type="button" className="gw-side-close" aria-label="Fechar menu" onClick={() => setOpen(false)}>
+            <X size={20} />
+          </button>
+        )}
+      </div>
 
-        <nav className="gw-nav-list">
-          {nav.map((item, i) =>
-            "section" in item ? (
-              <div key={"s" + i} className="gw-nav-section">
-                {item.section}
-              </div>
-            ) : (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className={cx("gw-nav", isActive(pathname, item.href) && "active")}
-              >
-                <item.icon size={19} strokeWidth={isActive(pathname, item.href) ? 2 : 1.7} />
-                <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
-                {item.badge && (
-                  <span
-                    style={{
-                      fontSize: 9.5,
-                      fontWeight: 800,
-                      letterSpacing: ".08em",
-                      fontFamily: "var(--mono)",
-                      padding: "2px 6px",
-                      borderRadius: 5,
-                      background: "rgba(255,255,255,.16)",
-                      color: "#fff",
-                    }}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-                {isActive(pathname, item.href) && <span className="gw-nav-dot" />}
-              </Link>
-            )
-          )}
-        </nav>
+      <nav className="gw-nav-list">
+        {nav.map((item, i) =>
+          "section" in item ? (
+            <div key={"s" + i} className="gw-nav-section">
+              {item.section}
+            </div>
+          ) : (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setOpen(false)}
+              className={cx("gw-nav", isActive(pathname, item.href) && "active")}
+            >
+              <item.icon size={19} strokeWidth={isActive(pathname, item.href) ? 2 : 1.7} />
+              <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
+              {item.badge && (
+                <span
+                  style={{
+                    fontSize: 9.5,
+                    fontWeight: 800,
+                    letterSpacing: ".08em",
+                    fontFamily: "var(--mono)",
+                    padding: "2px 6px",
+                    borderRadius: 5,
+                    background: "rgba(255,255,255,.16)",
+                    color: "#fff",
+                  }}
+                >
+                  {item.badge}
+                </span>
+              )}
+              {isActive(pathname, item.href) && <span className="gw-nav-dot" />}
+            </Link>
+          )
+        )}
+      </nav>
 
-        <div className="gw-side-foot">
-          <div className="gw-side-user">
-            <Avatar initials={getInitials(displayName || "GW")} size={36} tone="seed" />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: "#fff",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {displayName}
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: "rgba(255,255,255,.55)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {ROLE_LABEL[role]}
-              </div>
+      <div className="gw-side-foot">
+        <div className="gw-side-user">
+          <Avatar initials={getInitials(displayName || "GW")} size={36} tone="seed" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: "#fff",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {displayName}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "rgba(255,255,255,.55)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {ROLE_LABEL[role]}
             </div>
           </div>
         </div>
-      </aside>
+      </div>
     </>
+  );
+  return mobile ? (
+    <AppDialog open={open} onClose={() => setOpen(false)} label="Navegação principal" placement="navigation">
+      {content}
+    </AppDialog>
+  ) : (
+    <aside className="gw-sidebar" aria-label="Navegação principal">
+      {content}
+    </aside>
   );
 }

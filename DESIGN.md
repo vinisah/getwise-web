@@ -64,7 +64,7 @@ Preferências: formulário de largura flexível com prévia lateral; abaixo de 8
 
 ## Elevation & Depth
 
-Cards brancos, bordas suaves e separação por espaçamento. Manter a elevação sutil já existente em botões. A prévia usa o fundo do tema escolhido. Somente o diálogo de saída tem backdrop modal; foco e isolamento são do elemento nativo `dialog` aberto com `showModal`.
+Cards brancos, bordas suaves e separação por espaçamento. Manter a elevação sutil já existente em botões. A prévia usa o fundo do tema escolhido. O diálogo de saída usa o componente compartilhado `ui/AppDialog`, que gerencia foco, rolagem e limites da área visível.
 
 ## Shapes
 
