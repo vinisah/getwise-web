@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { BookOpen, Check, Palette, SlidersHorizontal, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,8 @@ export function PreferencesEditor({ accountName, preview = false }: { accountNam
   const [draft, setDraft] = useState(prefs);
   const [saved, setSaved] = useState(prefs);
   const [version, setVersion] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [nicknameError, setNicknameError] = useState("");
   const [notice, setNotice] = useState("");
@@ -34,48 +35,59 @@ export function PreferencesEditor({ accountName, preview = false }: { accountNam
   const nickname = useRef<HTMLInputElement>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
 
-  async function transfer(save?: UiPrefs) {
-    if (request.current) return;
-    const controller = new AbortController();
-    request.current = controller;
-    const timer = setTimeout(() => controller.abort(), 15000);
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await fetch("/api/me/prefs", {
+  const transfer = useCallback(
+    (save?: UiPrefs, expectedVersion?: string | null) => {
+      if (request.current) return;
+      const controller = new AbortController();
+      request.current = controller;
+      const timer = setTimeout(() => controller.abort(), 15000);
+      return fetch("/api/me/prefs", {
         method: save ? "POST" : "GET",
         signal: controller.signal,
         cache: "no-store",
         headers: save ? { "Content-Type": "application/json" } : undefined,
-        body: save ? JSON.stringify({ ...save, version }) : undefined,
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Não foi possível salvar suas preferências.");
-      if (controller.signal.aborted) return;
-      const next = normalizePrefs(data.prefs);
-      setVersion(data.version);
-      setSaved(next);
-      setDraft(next);
-      commit(next);
-      setNicknameError("");
-      if (save) setNotice("Preferências salvas na sua conta.");
-    } catch (cause) {
-      if (request.current !== controller) return;
-      setError(
-        controller.signal.aborted
-          ? "A conexão demorou demais. Suas escolhas continuam aqui; tente novamente."
-          : cause instanceof Error
-            ? cause.message
-            : "Não foi possível conectar. Tente novamente."
-      );
-    } finally {
-      clearTimeout(timer);
-      if (request.current === controller) {
-        request.current = null;
-        setBusy(false);
-      }
-    }
+        body: save ? JSON.stringify({ ...save, version: expectedVersion }) : undefined,
+      })
+        .then(async (response) => {
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error ?? "Não foi possível salvar suas preferências.");
+          if (controller.signal.aborted) return;
+          const next = normalizePrefs(data.prefs);
+          setVersion(data.version);
+          setSaved(next);
+          setDraft(next);
+          commit(next);
+          setNicknameError("");
+          if (save) setNotice("Preferências salvas na sua conta.");
+        })
+        .catch((cause: unknown) => {
+          if (request.current !== controller) return;
+          setError(
+            controller.signal.aborted
+              ? "A conexão demorou demais. Suas escolhas continuam aqui; tente novamente."
+              : cause instanceof Error
+                ? cause.message
+                : "Não foi possível conectar. Tente novamente."
+          );
+        })
+        .finally(() => {
+          clearTimeout(timer);
+          if (request.current === controller) {
+            request.current = null;
+            setBusy(false);
+          }
+        });
+    },
+    [commit]
+  );
+
+  function startTransfer(save?: UiPrefs) {
+    if (request.current) return;
+    setBusy(true);
+    setSaving(!!save);
+    setError("");
+    setNotice("");
+    return transfer(save, version);
   }
 
   useEffect(() => {
@@ -84,7 +96,7 @@ export function PreferencesEditor({ accountName, preview = false }: { accountNam
       request.current?.abort();
       request.current = null;
     };
-  }, []); // first load establishes the account version
+  }, [transfer]); // first load establishes the account version
 
   function update(patch: Partial<UiPrefs>) {
     setDraft((current) => ({ ...current, ...patch }));
@@ -98,7 +110,7 @@ export function PreferencesEditor({ accountName, preview = false }: { accountNam
       nickname.current?.focus();
       return;
     }
-    await transfer(parsed.data);
+    await startTransfer(parsed.data);
   }
 
   return (
@@ -244,7 +256,7 @@ export function PreferencesEditor({ accountName, preview = false }: { accountNam
           </section>
           <div className={styles.feedback} aria-live="polite">
             {busy ? (
-              <p> {version ? "Salvando suas preferências…" : "Carregando suas preferências…"}</p>
+              <p>{saving ? "Salvando suas preferências…" : "Carregando suas preferências…"}</p>
             ) : notice ? (
               <p className={styles.saved}>
                 <Check size={17} />
@@ -260,7 +272,7 @@ export function PreferencesEditor({ accountName, preview = false }: { accountNam
                   type="button"
                   variant="link"
                   onClick={() => {
-                    void transfer();
+                    void startTransfer();
                   }}
                 >
                   {version ? "Carregar preferências salvas" : "Tentar carregar novamente"}

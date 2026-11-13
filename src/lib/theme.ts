@@ -1,7 +1,7 @@
 /**
  * Sistema de temas (portado do mockup novo). Gera as CSS vars a partir das preferências
  * do usuário. Aplicado inline no <html> pelo layout-raiz (SSR, sem flash) a partir de um
- * cookie, e atualizado ao vivo pelo TweaksPanel. Persistência por usuário em User.uiPrefs.
+ * cookie visual, e sincronizado pelo PreferencesProvider. A fonte persistente é User.uiPrefs.
  */
 
 export type ThemeId = "marinho" | "royal" | "premium";

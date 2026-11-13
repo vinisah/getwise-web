@@ -14,8 +14,8 @@ function versionOf(raw: unknown) {
 }
 
 /**
- * Persiste as preferências de aparência (tema) do usuário logado.
- * A fonte ao vivo é o cookie (SSR sem flash); isto guarda no DB para futuro uso cross-device.
+ * Persiste as preferências pessoais da conta autenticada e detecta edições concorrentes.
+ * O cookie antecipa a aparência no SSR; o banco é a fonte compartilhada entre dispositivos.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const session = await requireAuth();

@@ -2,7 +2,7 @@ param([switch]$NoBrowser)
 $ErrorActionPreference = 'Stop'
 $project = Split-Path $PSScriptRoot -Parent
 Set-Location -LiteralPath $project
-$url = 'http://127.0.0.1:3001/admin/lessons/turmas'
+$url = 'http://127.0.0.1:3001/student/settings'
 
 # Codex instalado pela Microsoft Store pode virtualizar LOCALAPPDATA.
 $runtimeCandidates = @(
@@ -43,15 +43,32 @@ function Test-LocalApp {
     } catch { return $false }
 }
 
-if (-not (Test-LocalApp)) {
+$build = Get-Item '.next\BUILD_ID' -ErrorAction SilentlyContinue
+$inputs = @(Get-ChildItem src,public,prisma -File -Recurse)
+$inputs += @(Get-Item package.json,package-lock.json,next.config.ts,tsconfig.json,.env)
+$changed = -not $build -or @($inputs | Where-Object { $_.LastWriteTimeUtc -gt $build.LastWriteTimeUtc }).Count -gt 0
+$stateFile = Join-Path $runtime 'local-server.json'
+$running = Test-LocalApp
+if ($running) {
+    # Reutiliza somente a instancia desta copia, identificada na inicializacao.
+    # Nao encerra servidores desconhecidos nem processos de outros trabalhos.
+    $state = if (Test-Path -LiteralPath $stateFile) { Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json } else { $null }
+    $tracked = if ($state) { Get-Process -Id $state.pid -ErrorAction SilentlyContinue } else { $null }
+    $owned = $tracked -and $state.project -eq $project -and $tracked.StartTime.ToUniversalTime().Ticks.ToString() -eq $state.startedTicks
+    if (-not $owned) { throw 'A porta 3001 esta usando outra copia do Get Wise. Encerre esse servidor antes de iniciar esta versao.' }
+    if ($changed -or $state.buildId -ne (Get-Content -LiteralPath $build.FullName -Raw).Trim()) {
+        Write-Host 'Atualizando a instancia local desta pasta...'
+        Stop-Process -Id $tracked.Id
+        $tracked.WaitForExit(10000) | Out-Null
+        $running = $false
+    }
+}
+
+if (-not $running) {
     $probe = New-Object System.Net.Sockets.TcpClient
     try { $probe.Connect('127.0.0.1', 3001); $occupied = $true } catch { $occupied = $false } finally { $probe.Dispose() }
     if ($occupied) { throw 'Porta 3001 ocupada por um servidor que nao respondeu. Nenhum processo foi encerrado.' }
 
-    $build = Get-Item '.next\BUILD_ID' -ErrorAction SilentlyContinue
-    $inputs = @(Get-ChildItem src,public,prisma -File -Recurse)
-    $inputs += @(Get-Item package.json,package-lock.json,next.config.ts,tsconfig.json,.env)
-    $changed = -not $build -or @($inputs | Where-Object { $_.LastWriteTimeUtc -gt $build.LastWriteTimeUtc }).Count -gt 0
     if ($changed) {
         Write-Host 'Preparando versao local atualizada. Isso pode levar alguns minutos...'
         & $node node_modules/prisma/build/index.js generate
@@ -61,7 +78,8 @@ if (-not (Test-LocalApp)) {
         & $node node_modules/next/dist/bin/next build --webpack
         if ($LASTEXITCODE -ne 0) { throw 'Falha na compilacao local.' }
     }
-    $server = Start-Process -FilePath $node -ArgumentList 'node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3001' -WorkingDirectory $project -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runtime 'feature-production.log') -RedirectStandardError (Join-Path $runtime 'feature-production-error.log')
+    $env:NEXTAUTH_URL = 'http://127.0.0.1:3001'
+    $server = Start-Process -FilePath $node -ArgumentList 'node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3001' -WorkingDirectory $project -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runtime 'local-production.log') -RedirectStandardError (Join-Path $runtime 'local-production-error.log')
     $ready = $false
     for ($attempt = 0; $attempt -lt 30; $attempt++) {
         if (Test-LocalApp) { $ready = $true; break }
@@ -69,6 +87,12 @@ if (-not (Test-LocalApp)) {
         Start-Sleep -Seconds 1
     }
     if (-not $ready) { throw "Servidor nao respondeu. Confira os logs em $runtime" }
+    @{
+        project = $project
+        pid = $server.Id
+        startedTicks = $server.StartTime.ToUniversalTime().Ticks.ToString()
+        buildId = (Get-Content -LiteralPath '.next\BUILD_ID' -Raw).Trim()
+    } | ConvertTo-Json | Set-Content -LiteralPath $stateFile -Encoding UTF8
 } else { Write-Host 'Get Wise ja esta em execucao. Reutilizando servidor.' }
 
 Write-Host "Get Wise disponivel em $url"

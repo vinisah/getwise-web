@@ -3,7 +3,10 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { DEFAULT_PREFS, PREFS_COOKIE, THEMES, themeVars, type UiPrefs } from "@/lib/theme";
 
-const PreferencesContext = createContext({ prefs: DEFAULT_PREFS, commit: (_prefs: UiPrefs) => {} });
+const PreferencesContext = createContext<{ prefs: UiPrefs; commit: (prefs: UiPrefs) => void }>({
+  prefs: DEFAULT_PREFS,
+  commit: () => {},
+});
 
 export function PreferencesProvider({ initialPrefs, children }: { initialPrefs: UiPrefs; children: React.ReactNode }) {
   const [prefs, commit] = useState(initialPrefs);
