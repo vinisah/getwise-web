@@ -20,6 +20,8 @@ const CSP_REPORT_ONLY = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // O iniciador local tem saída própria: builds de revisão não sobrescrevem o servidor aberto.
+  distDir: process.env.GETWISE_LOCAL_RUNTIME === "1" ? ".next-local" : ".next",
   devIndicators: false,
   poweredByHeader: false,
 
@@ -40,7 +42,10 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },
-          { key: "Content-Security-Policy", value: "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'" },
+          {
+            key: "Content-Security-Policy",
+            value: "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'",
+          },
           // HTTPS forçado por 2 anos (browsers ignoram em http/localhost).
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
           { key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY },
