@@ -13,6 +13,7 @@ import { Logo } from "@/components/gw/logo";
 import { Avatar } from "@/components/gw/primitives";
 import {
   LayoutGrid,
+  Globe,
   Users,
   GraduationCap,
   Calendar,
@@ -40,6 +41,8 @@ const NAV: Record<string, NavEntry[]> = {
     { section: "Gestão" },
     { id: "dashboard", label: "Dashboard", href: "/admin", icon: LayoutGrid },
     { id: "students", label: "Alunos", href: "/admin/students", icon: Users },
+    { id: "pre-enrollments", label: "Pré-matrículas", href: "/admin/pre-enrollments", icon: UserCheck },
+    { id: "school-units", label: "Unidades", href: "/admin/school-units", icon: Globe },
     { id: "courses", label: "Cursos", href: "/admin/courses", icon: BookOpen },
     { id: "enrollments", label: "Matrículas", href: "/admin/enrollments", icon: GraduationCap },
     { id: "plans", label: "Planos", href: "/admin/plans", icon: Tag },

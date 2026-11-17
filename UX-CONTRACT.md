@@ -21,11 +21,13 @@ Ver `DESIGN.md`. Fonte canônica: `src/lib/theme.ts` e `src/app/globals.css`. Se
 
 ## Canonical UI Map
 
-| Capability | Canonical owner                                                   | Source of truth        | Allowed variants                      | Verification                                          |
-| ---------- | ----------------------------------------------------------------- | ---------------------- | ------------------------------------- | ----------------------------------------------------- |
-| Form       | `ui/Input`, `ui/Button`, `preferencesSchema`, `PreferencesEditor` | API e este contrato    | edição pessoal com prévia             | `preferences-editor.test.tsx` e Chrome                |
-| Scrollbar  | `src/app/globals.css`                                             | `DESIGN.md`            | somente geometria específica          | inspeção de CSS e Chrome                              |
-| CRUD       | `/api/me/prefs` e `PreferencesEditor`                             | conta real autenticada | leitura/edição/restauração reversível | `preferences.test.ts` e `preferences-editor.test.tsx` |
+| Capability     | Canonical owner                                                   | Source of truth                       | Allowed variants                         | Verification                                          |
+| -------------- | ----------------------------------------------------------------- | ------------------------------------- | ---------------------------------------- | ----------------------------------------------------- |
+| Form           | `ui/Input`, `ui/Button`, `preferencesSchema`, `PreferencesEditor` | API e este contrato                   | edição pessoal com prévia                | `preferences-editor.test.tsx` e Chrome                |
+| Scrollbar      | `src/app/globals.css`                                             | `DESIGN.md`                           | somente geometria específica             | inspeção de CSS e Chrome                              |
+| CRUD           | `/api/me/prefs` e `PreferencesEditor`                             | conta real autenticada                | leitura/edição/restauração reversível    | `preferences.test.ts` e `preferences-editor.test.tsx` |
+| Select/Listbox | `enrollment/fields.tsx` Field                                     | catálogo e administrador              | select nativo com popup da plataforma    | testes de formulário e Chrome                         |
+| Date           | `enrollment/fields.tsx` Field                                     | data ISO e idade em America/Sao_Paulo | date nativo com calendário da plataforma | testes de aniversário e Chrome                        |
 
 Escolhas curtas usam rádio nativo em `PreferenceChoices`. Não há Select/Listbox, seletor de data, tabela selecionável ou toast nesta tela. Validação é do aplicativo (`noValidate`); erros têm associação por `aria-describedby` e foco no campo inválido.
 
@@ -43,5 +45,26 @@ Escolhas curtas usam rádio nativo em `PreferenceChoices`. Não há Select/Listb
 Solicitações expiram em 15 segundos. Repetir uma gravação já aplicada é idempotente. Respostas atrasadas de tela desmontada não mudam o estado. O cookie de apresentação guarda somente aparência e movimento, sem apelido ou identidade; o banco é a fonte da conta entre dispositivos.
 
 ## Verification
+
+## Pré-matrícula e unidades (17/11/2026)
+
+Fonte de negócio: `docs/MATRICULA-ONLINE-DESIGN.md` e aprovação do usuário para implementação local. O envio cria pré-matrícula PENDING; somente a secretaria com a seção `pre-enrollments` pode consultar a ficha completa e decidir. A conta APPLICANT fica restrita às próprias solicitações. Saúde e aprendizagem são exclusivamente do aluno. Dados sensíveis ficam no banco e no estado da tela, sem localStorage ou query string. O e-mail do responsável identifica a conta de acompanhamento de menores e pode ser compartilhado entre solicitações de irmãos.
+
+| Capability     | Canonical owner                                                             | Source of truth                                  | Allowed variants                                                          | Verification                   |
+| -------------- | --------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------- | ------------------------------ |
+| Form           | `enrollment/fields.tsx`, `ui/Input`, `ui/Button` e schemas de pré-matrícula | `pre-enrollment/schema.ts`                       | aluno, responsável, unidade                                               | testes de formulário e API     |
+| Select/Listbox | `enrollment/fields.tsx` Field                                               | catálogo/administrador                           | select nativo; popup de plataforma aceito                                 | teclado e Chrome               |
+| Date           | `enrollment/fields.tsx` Field                                               | data ISO sem horário; idade em America/Sao_Paulo | input date nativo, apresentação de plataforma                             | testes de aniversário e Chrome |
+| CRUD           | APIs de unidades e pré-matrículas; `fetchJson`                              | validação no servidor + versão                   | criar volta à lista; revisar mantém detalhe; inscrição mostra comprovante | teste HTTP local completo      |
+
+Associação curso/unidade usa o mesmo vínculo nas duas telas. Cursos inativos e unidades fechadas não recebem inscrições. Trocar de unidade limpa o curso. O servidor revalida disponibilidade e impede duplicação por aluno, curso e unidade. Correção é permitida somente no estado CORRECTION e preserva a conta de acesso. Aprovação exige e-mail confirmado, prepara ficha acadêmica e não gera cobrança; efetivação é uma ação explícita na tela de matrícula, com plano, data e mensalidade. Atualizações concorrentes da ficha e dos vínculos retornam conflito.
+
+Listas de pré-matrículas têm paginação de 20 itens e filtros na URL; nomes digitados na busca são a única informação pessoal em filtro, nunca CPF/saúde. Cadastro de unidades usa lista limitada a 200 e páginas locais de 12. Criação/edição usa validação própria, erros associados e foco no primeiro erro. Formulário público preserva os dados entre etapas, bloqueia envio duplo e avisa ao sair com dados não enviados. Falha de SMTP mantém o protocolo e informa que a confirmação não foi entregue. Não há notificação de decisão por WhatsApp/e-mail nesta etapa; a decisão aparece no acompanhamento.
+
+Visual: identidade existente, coluna lateral com etapas reais do processo, formulário com seções claras, uma coluna no celular. Sem tokens novos de cor ou fonte; CSS usa `theme.ts`/`globals.css`. Controles nativos preservam teclado e acessibilidade de plataforma.
+
+Login usa e-mail e senha individuais. O botão de demonstração só existe quando `GETWISE_LOCAL_DEMO=1`, sem Vercel, em banco local `getwise_feature` e host loopback. O iniciador local configura essa condição para avaliação; produção não oferece esse acesso.
+
+Verificação adicional: `src/test/unit/pre-enrollment-schema.test.ts`, `src/test/unit/pre-enrollment-form.test.tsx`, `src/test/integration/pre-enrollment.test.ts` e `scripts/test-pre-enrollment-local.mjs`. O script HTTP usa dados fictícios exclusivos por execução e remove seus registros ao final.
 
 Testes de autenticação, isolamento de conta, validação, corrida/versão, repetição, salvamento, erro, prévia e movimento em `src/test/integration/preferences.test.ts` e `src/test/unit/preferences-editor.test.tsx`. Revisar no Chrome desktop e largura móvel, teclado e temas. Auditoria estática restrita à funcionalidade; não substitui teste no navegador.

@@ -85,6 +85,11 @@ export function UserActions({
         <option value="ADMIN">Admin</option>
         <option value="TEACHER">Professor</option>
         <option value="STUDENT">Aluno</option>
+        {role === "APPLICANT" && (
+          <option value="APPLICANT" disabled>
+            Pré-matrícula / responsável
+          </option>
+        )}
       </select>
       {role === "ADMIN" && profiles && (
         <select

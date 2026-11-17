@@ -6,11 +6,22 @@ import { prisma } from "./prisma";
 import { audit } from "./audit";
 import { PREVIEW_COOKIE } from "./effective-user";
 import type { Role } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import { checkRateLimit } from "./rate-limit";
+
+export function localDemoEnabled() {
+  if (process.env.GETWISE_LOCAL_DEMO !== "1" || process.env.VERCEL) return false;
+  try {
+    const u = new URL(process.env.DATABASE_URL!);
+    return u.hostname === "127.0.0.1" && u.pathname === "/getwise_feature";
+  } catch {
+    return false;
+  }
+}
 
 /**
- * Login passwordless (modo demonstração): autentica sempre como o primeiro ADMIN ativo.
- * Decisão consciente do dono — sistema em desenvolvimento, sem dados sensíveis.
- * ⚠️ Reavaliar antes de cadastrar dados reais: qualquer visitante vira ADMIN.
+ * Conta administrativa usada exclusivamente pela avaliação local explícita.
+ * O provider verifica flag, banco local, ausência de Vercel e host loopback antes desta consulta.
  */
 export async function resolveDemoAdmin() {
   return prisma.user.findFirst({
@@ -36,10 +47,23 @@ export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: "credentials",
-      // Login passwordless (demo): sem campos de credencial — entra sempre como ADMIN.
-      credentials: {},
-      async authorize() {
-        const admin = await resolveDemoAdmin();
+      // Credenciais individuais; demonstração disponível apenas no ambiente local explícito.
+      credentials: { email: { type: "email" }, password: { type: "password" }, demo: { type: "text" } },
+      async authorize(credentials, request) {
+        const email = credentials?.email?.trim().toLowerCase() ?? "";
+        const demo =
+          credentials?.demo === "1" &&
+          localDemoEnabled() &&
+          /^(127\.0\.0\.1|localhost)(:\d+)?$/.test(String(request.headers?.host ?? ""));
+        let admin;
+        if (demo) admin = await resolveDemoAdmin();
+        else {
+          if (!email || !credentials?.password || credentials.password.length > 72) return null;
+          if (!(await checkRateLimit(`login:${email}`, 10, 900000)).allowed) return null;
+          admin = await prisma.user.findUnique({ where: { email }, omit: { password: false } });
+          if (!admin?.isActive || !admin.password || !(await bcrypt.compare(credentials.password, admin.password)))
+            return null;
+        }
         if (!admin) return null;
 
         await audit({
@@ -47,7 +71,7 @@ export const authOptions: NextAuthOptions = {
           action: "LOGIN",
           entity: "User",
           entityId: admin.id,
-          payload: { success: true, passwordless: true },
+          payload: { success: true, passwordless: demo },
         });
 
         return {

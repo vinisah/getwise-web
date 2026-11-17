@@ -5,13 +5,37 @@ import { isUnsafeCrossOriginRequest } from "./request-security";
 
 /** Rótulos PT dos campos de formulário — para a mensagem de erro apontar o campo. */
 const FIELD_LABELS: Record<string, string> = {
-  name: "Nome", email: "E-mail", password: "Senha", phone: "Telefone", cpf: "CPF",
-  state: "Estado (UF)", city: "Cidade", zipCode: "CEP", address: "Endereço", birthDate: "Nascimento",
-  title: "Título", description: "Descrição", scheduledAt: "Data/hora", duration: "Duração",
-  meetingUrl: "Link da reunião", level: "Nível", amount: "Valor", date: "Data",
-  dueDate: "Vencimento", startDate: "Data de início", salary: "Salário", role: "Cargo/Papel",
-  planId: "Plano", studentId: "Aluno", discount: "Desconto", price: "Preço",
-  reference: "Referência", month: "Mês", year: "Ano", percent: "Percentual", contractType: "Contrato",
+  name: "Nome",
+  email: "E-mail",
+  password: "Senha",
+  phone: "Telefone",
+  cpf: "CPF",
+  state: "Estado (UF)",
+  city: "Cidade",
+  zipCode: "CEP",
+  address: "Endereço",
+  birthDate: "Nascimento",
+  title: "Título",
+  description: "Descrição",
+  scheduledAt: "Data/hora",
+  duration: "Duração",
+  meetingUrl: "Link da reunião",
+  level: "Nível",
+  amount: "Valor",
+  date: "Data",
+  dueDate: "Vencimento",
+  startDate: "Data de início",
+  salary: "Salário",
+  role: "Cargo/Papel",
+  planId: "Plano",
+  studentId: "Aluno",
+  discount: "Desconto",
+  price: "Preço",
+  reference: "Referência",
+  month: "Mês",
+  year: "Ano",
+  percent: "Percentual",
+  contractType: "Contrato",
 };
 
 /**
@@ -22,7 +46,7 @@ export function zodMessage(err: ZodError): string {
   const issue = err.issues[0];
   if (!issue) return "Dados inválidos";
   const key = issue.path.find((p) => typeof p === "string") as string | undefined;
-  const label = key ? FIELD_LABELS[key] ?? key : "";
+  const label = key ? (FIELD_LABELS[key] ?? key) : "";
   return label ? `${label}: ${issue.message}` : issue.message;
 }
 
@@ -64,10 +88,13 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
       }
       // Erros conhecidos do Prisma → status HTTP correto (em vez de 500 genérico).
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        if (err.code === "P2034")
+          return NextResponse.json(
+            { error: "Os dados mudaram durante a operação. Atualize a página e tente novamente." },
+            { status: 409 }
+          );
         if (err.code === "P2002") {
-          const target = Array.isArray(err.meta?.target)
-            ? (err.meta.target as string[]).join(", ")
-            : undefined;
+          const target = Array.isArray(err.meta?.target) ? (err.meta.target as string[]).join(", ") : undefined;
           const message = target ? `Registro duplicado: ${target}` : "Registro duplicado";
           return NextResponse.json({ error: message }, { status: 409 });
         }

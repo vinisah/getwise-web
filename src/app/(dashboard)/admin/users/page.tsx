@@ -13,6 +13,7 @@ const ROLE_BADGE: Record<string, { label: string; tone: string }> = {
   ADMIN: { label: "Admin", tone: "blue" },
   TEACHER: { label: "Professor", tone: "violet" },
   STUDENT: { label: "Aluno", tone: "slate" },
+  APPLICANT: { label: "Pré-matrícula / responsável", tone: "amber" },
 };
 
 export default async function UsersPage() {

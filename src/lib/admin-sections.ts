@@ -13,6 +13,8 @@ export interface AdminSection {
 export const ADMIN_SECTIONS: AdminSection[] = [
   { key: "dashboard", label: "Dashboard", group: "Gestão", route: "/admin" },
   { key: "students", label: "Alunos", group: "Gestão", route: "/admin/students" },
+  { key: "pre-enrollments", label: "Pré-matrículas", group: "Gestão", route: "/admin/pre-enrollments" },
+  { key: "school-units", label: "Unidades", group: "Gestão", route: "/admin/school-units" },
   { key: "courses", label: "Cursos", group: "Gestão", route: "/admin/courses" },
   { key: "enrollments", label: "Matrículas", group: "Gestão", route: "/admin/enrollments" },
   { key: "plans", label: "Planos", group: "Gestão", route: "/admin/plans" },

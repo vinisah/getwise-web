@@ -66,6 +66,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   // Atômico: cria a matrícula + a 1ª mensalidade PENDENTE (registro interno; boleto gerado à parte).
   const { enrollment, paymentId } = await prisma.$transaction(async (tx) => {
+    if (parsed.data.preEnrollmentId) {
+      const changed = await tx.preEnrollment.updateMany({
+        where: { id: parsed.data.preEnrollmentId, studentId, status: "APPROVED" },
+        data: { status: "ENROLLED", version: { increment: 1 } },
+      });
+      if (changed.count !== 1)
+        throw new ApiError(409, "Pré-matrícula indisponível para efetivação ou aluno incompatível.");
+    }
     const en = await tx.enrollment.create({
       data: {
         studentId,
@@ -102,7 +110,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       try {
         await generateChargeForPayment(paymentId);
       } catch (e) {
-        console.error("[billing] falha ao gerar boleto da matrícula", paymentId, e instanceof Error ? e.name : "UnknownError");
+        console.error(
+          "[billing] falha ao gerar boleto da matrícula",
+          paymentId,
+          e instanceof Error ? e.name : "UnknownError"
+        );
       }
     });
   } catch {

@@ -5,6 +5,16 @@ import { vi, afterEach } from "vitest";
 // Isolação: cada teste recebe mock limpo; sem contaminação do banco real.
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    schoolUnit: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
+    schoolUnitCourse: { findMany: vi.fn(), createMany: vi.fn(), deleteMany: vi.fn() },
+    preEnrollment: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      count: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
     user: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
@@ -14,7 +24,7 @@ vi.mock("@/lib/prisma", () => ({
       updateMany: vi.fn(),
       count: vi.fn(),
     },
-    studentProfile: { findUnique: vi.fn(), update: vi.fn() },
+    studentProfile: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
     enrollment: { findMany: vi.fn(), create: vi.fn(), count: vi.fn() },
     lesson: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     lessonBooking: {

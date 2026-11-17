@@ -41,6 +41,15 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
   const student = await prisma.user.findUnique({
     where: { id },
     include: {
+      approvedApplications: {
+        select: {
+          id: true,
+          schoolUnit: { select: { name: true } },
+          course: { select: { title: true } },
+          applicant: { select: { name: true, email: true, phone: true } },
+        },
+        take: 10,
+      },
       studentProfile: true,
       enrollments: {
         include: {
@@ -99,6 +108,24 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
+      {student.approvedApplications.length > 0 && (
+        <Card>
+          <h2 style={{ fontWeight: 700, marginBottom: 12 }}>Origem da matrícula e contato</h2>
+          {student.approvedApplications.map((a) => (
+            <div key={a.id} style={{ marginBottom: 12 }}>
+              <p>
+                {a.schoolUnit.name} · {a.course.title}
+              </p>
+              <p style={{ color: "var(--muted)" }}>
+                Conta de contato: {a.applicant.name} · {a.applicant.email} · {a.applicant.phone}
+              </p>
+              <Link href={`/admin/pre-enrollments/${a.id}`} style={{ color: "var(--accent)" }}>
+                Ver ficha de pré-matrícula
+              </Link>
+            </div>
+          ))}
+        </Card>
+      )}
       <div className="gw-two-col">
         <Card>
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", marginBottom: 14 }}>Dados</div>
@@ -107,7 +134,11 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
               <Mail size={15} color="var(--muted)" />
               <div>
                 <div style={labelStyle}>E-mail</div>
-                <div style={valueStyle}>{student.email}</div>
+                <div style={valueStyle}>
+                  {student.email.endsWith("@students.getwise.invalid")
+                    ? (student.approvedApplications[0]?.applicant.email ?? "Consultar responsável")
+                    : student.email}
+                </div>
               </div>
             </div>
             {student.phone && (

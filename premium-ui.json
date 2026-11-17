@@ -1,12 +1,18 @@
 {
   "profile": "product-admin",
-  "sourceRoots": ["src/components/preferences", "src/app/(dashboard)/student/settings", "src/app/api/me/prefs"],
+  "sourceRoots": [
+    "src/components/preferences",
+    "src/app/(dashboard)/student/settings",
+    "src/app/api/me/prefs",
+    "src/components/enrollment"
+  ],
   "locale": "pt-BR",
   "canonicalMap": "UX-CONTRACT.md",
-  "requiredCapabilities": ["Form", "Scrollbar", "CRUD"],
+  "requiredCapabilities": ["Form", "Scrollbar", "CRUD", "Select/Listbox", "Date"],
+  "ownership": { "Select/Listbox": "native", "Date": "native" },
   "requiredCommands": ["unit", "typecheck"],
   "commands": {
-    "unit": "node node_modules/vitest/vitest.mjs run src/test/integration/preferences.test.ts src/test/unit/preferences-editor.test.tsx --maxWorkers=2",
+    "unit": "node node_modules/vitest/vitest.mjs run src/test/integration/preferences.test.ts src/test/unit/preferences-editor.test.tsx src/test/unit/pre-enrollment-form.test.tsx src/test/integration/pre-enrollment.test.ts --maxWorkers=2",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit"
   },
   "evidence": {

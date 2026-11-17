@@ -15,6 +15,7 @@ export default async function AdminCoursesPage() {
   const courses = await prisma.course.findMany({
     orderBy: [{ order: "asc" }, { level: "asc" }],
     include: {
+      schoolUnits: { include: { schoolUnit: { select: { name: true } } } },
       _count: { select: { modules: true } },
       prerequisites: { include: { requiredCourse: { select: { title: true } } } },
     },
@@ -71,6 +72,9 @@ export default async function AdminCoursesPage() {
               </div>
               <div style={{ padding: "14px 16px 16px" }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)" }}>{c.title}</div>
+                <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>
+                  Unidades: {c.schoolUnits.map((u) => u.schoolUnit.name).join(", ") || "Nenhuma vinculada"}
+                </p>
                 {c.description && (
                   <p
                     style={{

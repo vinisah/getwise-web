@@ -18,15 +18,29 @@ export default function NewEnrollmentPage() {
   const [plans, setPlans] = useState<any[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [discount, setDiscount] = useState(0);
+  const [preEnrollment, setPreEnrollment] = useState<{
+    id: string;
+    studentId: string;
+    schoolUnit: { name: string };
+    course: { title: string };
+  } | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/students").then((r) => r.json()),
-      fetch("/api/plans").then((r) => r.json()),
-    ]).then(([s, p]) => {
-      setStudents(s);
-      setPlans(p);
-    });
+    const id = new URLSearchParams(window.location.search).get("preEnrollmentId");
+    if (id)
+      fetch(`/api/pre-enrollments/${encodeURIComponent(id)}?scope=admin`)
+        .then(async (r) => {
+          if (!r.ok) throw Error("Não foi possível carregar a pré-matrícula.");
+          return r.json();
+        })
+        .then(setPreEnrollment)
+        .catch((e) => setError(e.message));
+    Promise.all([fetch("/api/students").then((r) => r.json()), fetch("/api/plans").then((r) => r.json())]).then(
+      ([s, p]) => {
+        setStudents(s);
+        setPlans(p);
+      }
+    );
   }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -62,7 +76,9 @@ export default function NewEnrollmentPage() {
     <div className="space-y-6 max-w-xl">
       <div className="flex items-center gap-3">
         <Link href="/admin/enrollments">
-          <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
         </Link>
         <div>
           <h1 className="text-3xl font-bold text-[var(--brand)]">Nova Matrícula</h1>
@@ -72,19 +88,35 @@ export default function NewEnrollmentPage() {
 
       <form onSubmit={handleSubmit}>
         <Card>
-          <CardHeader><CardTitle className="text-lg">Dados da Matrícula</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-lg">Dados da Matrícula</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-4">
+            {preEnrollment && (
+              <>
+                <input type="hidden" name="preEnrollmentId" value={preEnrollment.id} />
+                <input type="hidden" name="studentId" value={preEnrollment.studentId} />
+                <p className="rounded-lg bg-muted p-4">
+                  Origem: {preEnrollment.schoolUnit.name} · {preEnrollment.course.title}. Ao criar a matrícula, o plano
+                  e a primeira mensalidade serão registrados.
+                </p>
+              </>
+            )}
             <div className="space-y-2">
               <Label htmlFor="studentId">Aluno *</Label>
               <select
                 id="studentId"
                 name="studentId"
                 required
+                value={preEnrollment?.studentId}
+                disabled={!!preEnrollment}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">Selecione um aluno</option>
                 {students.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} — {s.email}</option>
+                  <option key={s.id} value={s.id}>
+                    {s.name} — {s.email}
+                  </option>
                 ))}
               </select>
             </div>
@@ -112,9 +144,16 @@ export default function NewEnrollmentPage() {
 
             {selectedPlan && (
               <div className="rounded-lg bg-muted p-4 text-sm space-y-1">
-                <p><span className="font-medium">Plano:</span> {selectedPlan.name}</p>
-                <p><span className="font-medium">Aulas/mês:</span> {selectedPlan.lessonsPerMonth} ({selectedPlan.lessonDurationMin}min cada)</p>
-                <p><span className="font-medium">Valor:</span> {fmtCents(Number(selectedPlan.price))}</p>
+                <p>
+                  <span className="font-medium">Plano:</span> {selectedPlan.name}
+                </p>
+                <p>
+                  <span className="font-medium">Aulas/mês:</span> {selectedPlan.lessonsPerMonth} (
+                  {selectedPlan.lessonDurationMin}min cada)
+                </p>
+                <p>
+                  <span className="font-medium">Valor:</span> {fmtCents(Number(selectedPlan.price))}
+                </p>
                 {selectedPlan.description && <p className="text-muted-foreground">{selectedPlan.description}</p>}
               </div>
             )}
@@ -147,9 +186,7 @@ export default function NewEnrollmentPage() {
 
             {selectedPlan && discount > 0 && (
               <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm">
-                <p className="text-green-700 font-medium">
-                  Valor final: {fmtCents(finalPrice)}/mês
-                </p>
+                <p className="text-green-700 font-medium">Valor final: {fmtCents(finalPrice)}/mês</p>
               </div>
             )}
 
@@ -167,7 +204,9 @@ export default function NewEnrollmentPage() {
 
             <div className="flex gap-3 pt-2">
               <Link href="/admin/enrollments" className="flex-1">
-                <Button variant="outline" className="w-full">Cancelar</Button>
+                <Button variant="outline" className="w-full">
+                  Cancelar
+                </Button>
               </Link>
               <Button type="submit" className="flex-1" disabled={loading}>
                 {loading ? "Criando..." : "Criar Matrícula"}

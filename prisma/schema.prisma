@@ -7,10 +7,80 @@ datasource db {
   provider = "postgresql"
 }
 
+model SchoolUnit {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  legalName String
+  cnpj String
+  zipCode String
+  address String
+  number String
+  complement String @default("")
+  neighborhood String
+  city String
+  state String
+  phone String
+  mobile String @default("")
+  email String
+  classification String @default("")
+  notes String @default("")
+  logoUrl String @default("")
+  photos String[] @default([])
+  partners Json @default("[]")
+  consultants String[] @default(["Secretaria", "Outro"])
+  isActive Boolean @default(true)
+  enrollmentOpen Boolean @default(true)
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  courses SchoolUnitCourse[]
+  applications PreEnrollment[]
+  @@map("school_units")
+}
+
+model SchoolUnitCourse {
+  schoolUnitId String
+  courseId String
+  schoolUnit SchoolUnit @relation(fields: [schoolUnitId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  @@id([schoolUnitId, courseId])
+  @@map("school_unit_courses")
+}
+
+model PreEnrollment {
+  id String @id @default(cuid())
+  requestId String @unique
+  protocol String @unique
+  applicantId String
+  schoolUnitId String
+  courseId String
+  studentId String?
+  studentCpf String
+  studentName String
+  data Json
+  status String @default("PENDING")
+  feedback String @default("")
+  version Int @default(1)
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  applicant User @relation("Applicant", fields: [applicantId], references: [id])
+  student User? @relation("ApprovedStudent", fields: [studentId], references: [id])
+  schoolUnit SchoolUnit @relation(fields: [schoolUnitId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+  @@unique([studentCpf, courseId, schoolUnitId])
+  @@index([applicantId, createdAt])
+  @@index([status, createdAt])
+  @@map("pre_enrollments")
+}
+
 enum Role {
   ADMIN
   TEACHER
   STUDENT
+  APPLICANT
 }
 
 enum EnrollmentStatus {
@@ -92,6 +162,8 @@ enum CEFRLevel {
 // ─── Usuários ────────────────────────────────────────────────────────────────
 
 model User {
+  applications PreEnrollment[] @relation("Applicant")
+  approvedApplications PreEnrollment[] @relation("ApprovedStudent")
   id            String    @id @default(cuid())
   name          String
   email         String    @unique
@@ -575,6 +647,8 @@ model AuditLog {
 // ─── Plataforma de Cursos (self-paced) ─────────────────────────────────────────
 
 model Course {
+  schoolUnits SchoolUnitCourse[]
+  applications PreEnrollment[]
   id          String    @id @default(cuid())
   title       String
   description String?   @db.Text

@@ -1,171 +1,126 @@
 "use client";
-
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "@/components/gw/logo";
-import { Avatar } from "@/components/gw/primitives";
 import { Button } from "@/components/ui/button";
-import { Check, Globe, ArrowRight } from "lucide-react";
-
-const VERIFY_MSG: Record<string, { text: string; ok: boolean }> = {
-  success: { text: "E-mail confirmado! Faça login.", ok: true },
-  expired: { text: "Link de confirmação expirado. Cadastre-se novamente.", ok: false },
-  invalid: { text: "Link de confirmação inválido.", ok: false },
-};
-
-function LoginInner() {
+import { Field, PasswordField, fetchJson } from "@/components/enrollment/fields";
+import s from "@/components/enrollment/enrollment.module.css";
+function Login() {
   const router = useRouter();
   const params = useSearchParams();
-  const verify = params.get("verify");
-  const verifyMsg = verify ? VERIFY_MSG[verify] : null;
-
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  // Login passwordless (demo): entra direto como ADMIN, sem credenciais.
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    const result = await signIn("credentials", { redirect: false });
-    setLoading(false);
-
-    if (result?.error) {
-      setError("Não foi possível entrar. Tente novamente.");
+  const [busy, setBusy] = useState(false);
+  const [demo, setDemo] = useState(false);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetchJson("/api/auth/local-preview", { signal: ctrl.signal })
+      .then((r) => setDemo(r.enabled))
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, []);
+  async function enter(localDemo = false) {
+    if (busy) return;
+    if (!localDemo && (!email || !password)) {
+      setError("Informe seu e-mail e senha.");
+      document.getElementById(!email ? "email" : "password")?.focus();
       return;
     }
-    router.push("/");
-    router.refresh();
+    setBusy(true);
+    setError("");
+    try {
+      const r = await signIn("credentials", { email, password, demo: localDemo ? "1" : "0", redirect: false });
+      if (r?.error) {
+        setError("Não foi possível entrar. Confira seu e-mail e senha.");
+        return;
+      }
+      const destination = params.get("callbackUrl");
+      router.push(destination?.startsWith("/") && !destination.startsWith("//") ? destination : "/");
+      router.refresh();
+    } catch {
+      setError("Falha de conexão. Tente novamente.");
+    } finally {
+      setBusy(false);
+    }
   }
-
   return (
-    <div className="gw-login">
-      {/* Painel brand esquerdo */}
-      <div className="gw-login-brand">
-        <div style={{ position: "relative", zIndex: 2 }}>
-          <Logo variant="icon" white height={48} />
-        </div>
-
+    <main className="gw-login">
+      <aside className="gw-login-brand">
+        <Logo variant="icon" white height={48} />
         <div className="gw-login-brand-mid">
-          <span
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: ".14em",
-              textTransform: "uppercase",
-              color: "rgba(255,255,255,.6)",
-            }}
-          >
-            Sistema de gestão · Idiomas
-          </span>
-          <h1
-            style={{
-              fontSize: 40,
-              fontWeight: 800,
-              color: "#fff",
-              letterSpacing: "-.03em",
-              lineHeight: 1.08,
-              marginTop: 16,
-            }}
-          >
-            Ensine, acompanhe
+          <p style={{ color: "#ffffffb8", letterSpacing: ".12em", fontSize: 11 }}>GET WISE · SPEAK ENGLISH</p>
+          <h1 style={{ color: "white", fontSize: 44, fontWeight: 800, lineHeight: 1.12, marginTop: 20 }}>
+            Um novo idioma.
             <br />
-            e faça seus alunos
-            <br />
-            <span style={{ color: "#9FB4FF" }}>falarem inglês.</span>
+            Mais possibilidades.
           </h1>
-          <p style={{ fontSize: 15, color: "rgba(255,255,255,.7)", marginTop: 18, maxWidth: 380, lineHeight: 1.55 }}>
-            Matrículas, aulas, financeiro e um tutor de IA — tudo em um só lugar, com a cara da Get Wise.
-          </p>
-          <div className="gw-login-pills">
-            {["Gestão de alunos", "Financeiro", "Tutor IA", "Relatórios"].map((p) => (
-              <span key={p} className="gw-login-pill">
-                <Check size={14} strokeWidth={2.4} />
-                {p}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="gw-login-brand-foot">
-          <Avatar initials="MA" size={34} tone="seed" />
-          <p style={{ fontSize: 13, color: "rgba(255,255,255,.78)", lineHeight: 1.5, margin: 0 }}>
-            "Reduzi pela metade o tempo gasto com a secretaria." <b style={{ color: "#fff" }}>— Marina, coordenadora</b>
+          <p style={{ color: "#ffffffb8", maxWidth: 370, marginTop: 24, lineHeight: 1.7 }}>
+            Seu espaço para aprender, acompanhar as aulas e se conectar com a Get Wise.
           </p>
         </div>
-
-        <div className="gw-login-orb" />
-        <div className="gw-login-orb two" />
-      </div>
-
-      {/* Form direito */}
-      <div className="gw-login-form-wrap">
+        <p style={{ color: "#ffffffb8" }}>Uma etapa de cada vez. A gente segue com você.</p>
+      </aside>
+      <section className="gw-login-form-wrap">
         <div className="gw-login-form">
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 26 }}>
-            <Logo variant="icon" height={52} />
-          </div>
-          <h2
-            style={{ fontSize: 23, fontWeight: 800, color: "var(--ink)", letterSpacing: "-.02em", textAlign: "center" }}
+          <Logo variant="icon" height={48} />
+          <h2 style={{ fontSize: 28, fontWeight: 800, marginTop: 24 }}>Bem-vindo de volta</h2>
+          <p className={s.muted}>Entre para estudar ou acompanhar sua pré-matrícula.</p>
+          <form
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              void enter();
+            }}
+            className={s.stack}
+            style={{ marginTop: 28 }}
           >
-            Bem-vindo de volta
-          </h2>
-          <p style={{ fontSize: 13.5, color: "var(--muted)", textAlign: "center", marginTop: 5 }}>
-            Acesse o portal Get Wise
-          </p>
-
-          <form onSubmit={handleSubmit} style={{ marginTop: 26, display: "flex", flexDirection: "column", gap: 14 }}>
-            <p style={{ fontSize: 12.5, color: "var(--muted)", textAlign: "center", lineHeight: 1.5 }}>
-              Acesso de demonstração — você entra como administrador, sem senha.
-            </p>
-
-            {verifyMsg && (
-              <p
-                style={{ fontSize: 13, color: verifyMsg.ok ? "var(--success)" : "var(--danger)", textAlign: "center" }}
-              >
-                {verifyMsg.text}
+            <Field name="email" label="E-mail" value={email} onChange={setEmail} type="email" autoComplete="username" />
+            <PasswordField value={password} onChange={setPassword} />
+            <Link href="/forgot-password" className={s.link}>
+              Esqueci minha senha
+            </Link>
+            {params.get("verify") && (
+              <p role="status" className={s.notice}>
+                {params.get("verify") === "success"
+                  ? "E-mail confirmado. Você já pode entrar."
+                  : "O link não pôde ser confirmado. Entre na sua conta e solicite um novo envio no acompanhamento."}
               </p>
             )}
-            {error && <p style={{ fontSize: 13, color: "var(--danger)", textAlign: "center" }}>{error}</p>}
-
-            <Button
-              type="submit"
-              variant="accent"
-              disabled={loading}
-              style={{ marginTop: 4, width: "100%", padding: 13 }}
-            >
-              {loading ? "Entrando..." : "Entrar no portal"}
-              {!loading && <ArrowRight size={17} />}
+            {error && (
+              <p role="alert" className={s.error}>
+                {error}
+              </p>
+            )}
+            <Button disabled={busy} type="submit">
+              {busy ? "Entrando…" : "Entrar no portal"}
             </Button>
           </form>
-
-          <div className="gw-login-or">
-            <span>ou</span>
-          </div>
-          <button type="button" className="gw-sso">
-            <Globe size={18} />
-            Entrar com Google Workspace
-          </button>
-
-          <p style={{ fontSize: 12.5, color: "var(--muted)", textAlign: "center", marginTop: 22 }}>
+          <p className={s.muted} style={{ marginTop: 28 }}>
             Novo na escola?{" "}
-            <Link href="/register" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
+            <Link className={s.link} href="/register">
               Fazer matrícula online
             </Link>
           </p>
+          {demo && (
+            <div className={s.notice}>
+              <p>Avaliação local</p>
+              <Button disabled={busy} variant="outline" onClick={() => enter(true)}>
+                Abrir painel administrativo
+              </Button>
+            </div>
+          )}
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
-
-export default function LoginPage() {
+export default function Page() {
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", background: "var(--bg)" }} />}>
-      <LoginInner />
+    <Suspense fallback={<p>Carregando acesso…</p>}>
+      <Login />
     </Suspense>
   );
 }

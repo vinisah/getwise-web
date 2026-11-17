@@ -32,6 +32,19 @@ export async function generateChargeForPayment(paymentId: string): Promise<Gener
   if (payment.chargeId)
     return { paymentId, status: "skipped", reason: "cobrança já existe", chargeId: payment.chargeId };
 
+  // Registros acadêmicos de crianças não possuem caixa postal própria.
+  // Mantém o pagador definido pelo fluxo financeiro e usa o contato da conta responsável.
+  let contactEmail = payment.student.email;
+  if (contactEmail.endsWith("@students.getwise.invalid")) {
+    const application = await prisma.preEnrollment.findFirst({
+      where: { studentId: payment.studentId, status: "ENROLLED" },
+      orderBy: { updatedAt: "desc" },
+      select: { applicant: { select: { email: true } } },
+    });
+    if (!application) return { paymentId, status: "error", reason: "Contato do responsável não encontrado" };
+    contactEmail = application.applicant.email;
+  }
+
   const provider = getBoletoProvider();
   const charge = await provider.createCharge({
     paymentId: payment.id,
@@ -40,7 +53,7 @@ export async function generateChargeForPayment(paymentId: string): Promise<Gener
     description: payment.description ?? `Mensalidade ${payment.month}/${payment.year}`,
     customer: {
       name: payment.student.name,
-      email: payment.student.email,
+      email: contactEmail,
       phone: payment.student.phone,
       taxId: payment.student.studentProfile?.cpf ?? null,
     },

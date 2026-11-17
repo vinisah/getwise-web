@@ -53,6 +53,7 @@ export const CreateStudentSchema = z.object({
 // ─── Matrículas ───────────────────────────────────────────────────────────────
 
 export const CreateEnrollmentSchema = z.object({
+  preEnrollmentId: z.string().min(1).optional(),
   studentId: z.string().min(1, "ID inválido"),
   planId: z.string().min(1, "ID inválido"),
   startDate: DateString,

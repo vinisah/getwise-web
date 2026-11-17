@@ -1,8 +1,8 @@
-param([switch]$NoBrowser)
+param([switch]$NoBrowser, [switch]$ForceBuild)
 $ErrorActionPreference = 'Stop'
 $project = Split-Path $PSScriptRoot -Parent
 Set-Location -LiteralPath $project
-$url = 'http://127.0.0.1:3001/student/settings'
+$url = 'http://127.0.0.1:3001/register'
 
 # Codex instalado pela Microsoft Store pode virtualizar LOCALAPPDATA.
 $runtimeCandidates = @(
@@ -46,7 +46,7 @@ function Test-LocalApp {
 $build = Get-Item '.next\BUILD_ID' -ErrorAction SilentlyContinue
 $inputs = @(Get-ChildItem src,public,prisma -File -Recurse)
 $inputs += @(Get-Item package.json,package-lock.json,next.config.ts,tsconfig.json,.env)
-$changed = -not $build -or @($inputs | Where-Object { $_.LastWriteTimeUtc -gt $build.LastWriteTimeUtc }).Count -gt 0
+$changed = $ForceBuild -or -not $build -or @($inputs | Where-Object { $_.LastWriteTimeUtc -gt $build.LastWriteTimeUtc }).Count -gt 0
 $stateFile = Join-Path $runtime 'local-server.json'
 $running = Test-LocalApp
 if ($running) {
@@ -75,10 +75,14 @@ if (-not $running) {
         if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar Prisma Client.' }
         & $node scripts/migrate-scheduling.mjs
         if ($LASTEXITCODE -ne 0) { throw 'Falha ao preparar agenda no banco local.' }
+        & $node scripts/migrate-pre-enrollment.mjs
+        if ($LASTEXITCODE -ne 0) { throw 'Falha ao preparar pre-matriculas no banco local.' }
         & $node node_modules/next/dist/bin/next build --webpack
         if ($LASTEXITCODE -ne 0) { throw 'Falha na compilacao local.' }
     }
     $env:NEXTAUTH_URL = 'http://127.0.0.1:3001'
+    $env:NEXT_PUBLIC_APP_URL = 'http://127.0.0.1:3001'
+    $env:GETWISE_LOCAL_DEMO = '1'
     $server = Start-Process -FilePath $node -ArgumentList 'node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3001' -WorkingDirectory $project -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runtime 'local-production.log') -RedirectStandardError (Join-Path $runtime 'local-production-error.log')
     $ready = $false
     for ($attempt = 0; $attempt -lt 30; $attempt++) {

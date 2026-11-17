@@ -15,6 +15,8 @@ export async function requireAuth(...adminSections: string[]): Promise<{ user: S
   if (!session?.user) {
     throw new ApiError(401, "Não autenticado");
   }
+  if (session.user.role === "APPLICANT")
+    throw new ApiError(403, "Sua conta tem acesso ao acompanhamento de pré-matrículas.");
   // As permissões vêm da sessão revalidada no banco, nunca do corpo da requisição.
   if (session.user.role === "ADMIN" && adminSections.length) {
     assertAdminSections(session.user, adminSections);

@@ -34,16 +34,29 @@ export async function proxy(req: NextRequest) {
     // Páginas consultam o banco diretamente. Não podem autorizar usando um JWT antigo
     // depois que o dono remove uma permissão ou rebaixa/desativa a conta.
     if (!pathname.startsWith("/api/")) {
-      const current = typeof token.id === "string" ? await prisma.user.findUnique({
-        where: { id: token.id },
-        select: { isActive: true, role: true, profile: { select: { sections: true } } },
-      }) : null;
+      const current =
+        typeof token.id === "string"
+          ? await prisma.user.findUnique({
+              where: { id: token.id },
+              select: { isActive: true, role: true, profile: { select: { sections: true } } },
+            })
+          : null;
       if (!current?.isActive) return NextResponse.redirect(new URL("/login", req.url));
       role = current.role;
       sections = current.profile?.sections ?? null;
     }
 
     // Raiz: roteia direto p/ a home do papel (mata a cadeia / → /login → role-home).
+    if (
+      role === "APPLICANT" &&
+      !isRoot &&
+      !pathname.startsWith("/pre-enrollments") &&
+      !pathname.startsWith("/api/pre-enrollments")
+    ) {
+      if (pathname.startsWith("/api/"))
+        return NextResponse.json({ error: "Acesso restrito ao acompanhamento de pré-matrículas." }, { status: 403 });
+      return NextResponse.redirect(new URL("/pre-enrollments", req.url));
+    }
     if (isRoot) {
       return NextResponse.redirect(new URL(roleHome(role), req.url));
     }
@@ -88,7 +101,10 @@ export async function proxy(req: NextRequest) {
 export const config = {
   matcher: [
     // IDs/rotas protegidas com sufixo de imagem não podem escapar do controle.
-    "/api/:path*", "/admin/:path*", "/teacher/:path*", "/student/:path*",
+    "/api/:path*",
+    "/admin/:path*",
+    "/teacher/:path*",
+    "/student/:path*",
     // Todas as rotas exceto assets estáticos e _next interno
     "/((?!_next/static|_next/image|favicon.ico|.*\\.png|.*\\.svg|.*\\.jpg|.*\\.jpeg|.*\\.webp).*)",
   ],
