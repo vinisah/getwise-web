@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { reaisToCents } from "./money";
+import { STAFF_ROLES } from "./roles";
 
 // ─── Reutilizáveis ───────────────────────────────────────────────────────────
 
@@ -211,7 +212,7 @@ export const AdjustPlansSchema = z.object({
 
 export const UpdateUserSchema = z
   .object({
-    role: z.enum(["ADMIN", "TEACHER", "STUDENT"]).optional(),
+    role: z.enum(STAFF_ROLES).optional(),
     isActive: z.boolean().optional(),
     // Senha temporária definida pelo admin (usuário troca depois).
     password: z.string().min(6, "Mínimo 6 caracteres").max(100).optional(),

@@ -1,0 +1,17 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["src/app/(dashboard)/admin/users"],
+  "locale": "pt-BR",
+  "canonicalMap": "docs/USUARIOS-EQUIPE.md",
+  "requiredCapabilities": ["Form", "Scrollbar", "CRUD", "Select/Listbox"],
+  "ownership": { "Select/Listbox": "native" },
+  "requiredCommands": ["unit", "typecheck"],
+  "commands": {
+    "unit": "node node_modules/vitest/vitest.mjs run src/test/integration/staff-users.test.tsx src/test/components/staff-user-actions.test.tsx src/test/integration/admin-controls.test.ts --maxWorkers=2",
+    "typecheck": "node node_modules/typescript/bin/tsc --noEmit"
+  },
+  "evidence": {
+    "crudFullFlow": "src/test/integration/staff-users.test.tsx",
+    "failurePaths": "src/test/components/staff-user-actions.test.tsx"
+  }
+}

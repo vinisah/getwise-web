@@ -32,8 +32,8 @@ describe("PATCH /api/users/[id]", () => {
   const ctxOther = { params: Promise.resolve({ id: "u-2" }) };
   const ctxSelf = { params: Promise.resolve({ id: "admin-1" }) };
 
-  it("admin troca role de outro usuário", async () => {
-    (mockPrisma.user.findUnique as any).mockResolvedValueOnce({ id: "u-2", role: "STUDENT" });
+  it("admin troca role de outro membro da equipe", async () => {
+    (mockPrisma.user.findUnique as any).mockResolvedValueOnce({ id: "u-2", role: "ADMIN" });
     (mockPrisma.user.update as any).mockResolvedValueOnce({ id: "u-2", role: "TEACHER", isActive: true });
 
     const res = await userPATCH(req("http://localhost/api/users/u-2", "PATCH", { role: "TEACHER" }), ctxOther as any);
@@ -44,7 +44,7 @@ describe("PATCH /api/users/[id]", () => {
   it("admin NÃO rebaixa a si mesmo (anti-lockout)", async () => {
     (mockPrisma.user.findUnique as any).mockResolvedValueOnce({ id: "admin-1", role: "ADMIN" });
     const res = await userPATCH(
-      req("http://localhost/api/users/admin-1", "PATCH", { role: "STUDENT" }),
+      req("http://localhost/api/users/admin-1", "PATCH", { role: "TEACHER" }),
       ctxSelf as any
     );
     expect(res.status).toBe(400);
@@ -60,7 +60,7 @@ describe("PATCH /api/users/[id]", () => {
   });
 
   it("senha temporária é hasheada (nunca texto plano)", async () => {
-    (mockPrisma.user.findUnique as any).mockResolvedValueOnce({ id: "u-2", role: "STUDENT" });
+    (mockPrisma.user.findUnique as any).mockResolvedValueOnce({ id: "u-2", role: "TEACHER" });
     (mockPrisma.user.update as any).mockResolvedValueOnce({ id: "u-2" });
 
     await userPATCH(req("http://localhost/api/users/u-2", "PATCH", { password: "nova123" }), ctxOther as any);
@@ -107,8 +107,8 @@ describe("PATCH /api/users/[id]", () => {
 
   it("demoção de ADMIN limpa o profileId (evita perfil stale numa re-promoção)", async () => {
     (mockPrisma.user.findUnique as any).mockResolvedValueOnce({ id: "u-2", role: "ADMIN" });
-    (mockPrisma.user.update as any).mockResolvedValueOnce({ id: "u-2", role: "STUDENT" });
-    const res = await userPATCH(req("http://localhost/api/users/u-2", "PATCH", { role: "STUDENT" }), ctxOther as any);
+    (mockPrisma.user.update as any).mockResolvedValueOnce({ id: "u-2", role: "TEACHER" });
+    const res = await userPATCH(req("http://localhost/api/users/u-2", "PATCH", { role: "TEACHER" }), ctxOther as any);
     expect(res.status).toBe(200);
     expect((mockPrisma.user.update as any).mock.calls[0][0].data.profileId).toBeNull();
   });

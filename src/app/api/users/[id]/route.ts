@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 import { UpdateUserSchema } from "@/lib/schemas";
 import { prisma } from "@/lib/prisma";
+import { isStaffRole } from "@/lib/roles";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -24,6 +25,12 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
 
   const target = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
   if (!target) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+  if (!isStaffRole(target.role)) {
+    throw new ApiError(
+      400,
+      "Esta área gerencia somente a equipe interna. Consulte Alunos ou Pré-matrículas para este cadastro."
+    );
+  }
 
   // Anti-lockout: ninguém tira o próprio acesso/poder.
   if (id === session.user.id && role !== undefined && role !== "ADMIN") {

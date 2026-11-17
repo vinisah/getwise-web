@@ -1,24 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-error";
 import { requireAdmin } from "@/lib/api-auth";
-import { prisma } from "@/lib/prisma";
+import { listStaffUsers } from "@/lib/staff-users";
 
-/** GET /api/users — todos os usuários (gestão de acesso). */
-export const GET = withErrorHandler(async (_req: NextRequest) => {
+/** GET /api/users?page=1 — acessos da equipe; paginação informada nos headers. */
+export const GET = withErrorHandler(async (req: NextRequest) => {
   await requireAdmin("users");
 
-  const users = await prisma.user.findMany({
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      isActive: true,
-      emailVerified: true,
-      createdAt: true,
+  const result = await listStaffUsers(req.nextUrl.searchParams.get("page"));
+  return NextResponse.json(result.users, {
+    headers: {
+      "X-Total-Count": String(result.total),
+      "X-Page": String(result.page),
+      "X-Page-Size": String(result.pageSize),
+      "Cache-Control": "no-store",
     },
-    orderBy: [{ role: "asc" }, { name: "asc" }],
   });
-
-  return NextResponse.json(users);
 });
