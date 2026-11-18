@@ -108,29 +108,31 @@ function List({ admin }: { admin: boolean }) {
         </div>
         <form
           noValidate
-          className={s.toolbar}
+          className={admin ? `${s.card} ${s.filterPanel}` : s.toolbar}
           onSubmit={(e) => {
             e.preventDefault();
             filter("q", query);
           }}
         >
-          <Field name="searchApplications" label="Buscar aluno" optional value={query} onChange={setQuery} />
-          <Button type="submit" variant="outline">
-            Buscar
-          </Button>
-          {query && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setQuery("");
-                filter("q", "");
-                document.getElementById("searchApplications")?.focus();
-              }}
-            >
-              Limpar busca
+          <div className={admin ? s.searchControls : undefined} style={admin ? undefined : { display: "contents" }}>
+            <Field name="searchApplications" label="Buscar aluno" optional value={query} onChange={setQuery} />
+            <Button type="submit" variant="outline">
+              Buscar
             </Button>
-          )}
+            {query && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setQuery("");
+                  filter("q", "");
+                  document.getElementById("searchApplications")?.focus();
+                }}
+              >
+                Limpar busca
+              </Button>
+            )}
+          </div>
           <Field
             name="status"
             label="Situação"
@@ -175,6 +177,19 @@ function List({ admin }: { admin: boolean }) {
               />
             </>
           )}
+          {admin && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setQuery("");
+                router.replace(path);
+                document.getElementById("searchApplications")?.focus();
+              }}
+            >
+              Limpar filtros
+            </Button>
+          )}
         </form>
         {loading ? (
           <p role="status" className={s.notice}>
@@ -189,27 +204,89 @@ function List({ admin }: { admin: boolean }) {
           </div>
         ) : (
           <>
-            <p className={s.muted}>{result.total} solicitação(ões)</p>
-            <div className={s.list}>
-              {result.items.map((item) => (
-                <Link className={s.card} href={`${path}/${item.id}`} key={item.id}>
-                  <div className={s.titleRow}>
-                    <h2>{item.studentName}</h2>
-                    <span className={s.pill}>{statusLabels[item.status]}</span>
+            {admin ? (
+              <section className={s.card} aria-labelledby="applications-heading">
+                <div className={s.titleRow}>
+                  <h2 id="applications-heading">Solicitações</h2>
+                  <span className={s.pill}>{result.total} resultado(s)</span>
+                </div>
+                {result.items.length ? (
+                  <div className={s.tableWrap}>
+                    <table className={s.reviewTable} role="table" aria-label="Solicitações de pré-matrícula">
+                      <thead>
+                        <tr>
+                          <th scope="col">Aluno / protocolo</th>
+                          <th scope="col">Unidade / curso</th>
+                          <th scope="col">Situação</th>
+                          <th scope="col">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.items.map((item) => (
+                          <tr key={item.id}>
+                            <td data-label="Aluno / protocolo">
+                              <strong>{item.studentName}</strong>
+                              <small>
+                                {item.protocol} ·{" "}
+                                {new Date(item.createdAt).toLocaleDateString("pt-BR", {
+                                  timeZone: "America/Sao_Paulo",
+                                })}
+                              </small>
+                            </td>
+                            <td data-label="Unidade / curso">
+                              {item.schoolUnit.name}
+                              <small>{item.course.title}</small>
+                            </td>
+                            <td data-label="Situação">
+                              <span className={s.pill}>{statusLabels[item.status]}</span>
+                              {item.feedback && <small>{item.feedback}</small>}
+                            </td>
+                            <td data-label="Ação">
+                              <Button asChild variant="outline">
+                                <Link
+                                  href={path + "/" + item.id}
+                                  aria-label={"Analisar solicitação de " + item.studentName}
+                                >
+                                  Analisar
+                                </Link>
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <p className={s.muted}>
-                    {item.schoolUnit.name} · {item.course.title}
-                  </p>
-                  <p className={s.muted}>
-                    {item.protocol} ·{" "}
-                    {new Date(item.createdAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
-                  </p>
-                  {item.feedback && <p className={s.notice}>{item.feedback}</p>}
-                  <span className={s.link}>{admin ? "Analisar solicitação" : "Ver solicitação"} →</span>
-                </Link>
-              ))}
-            </div>
-            {!result.items.length && <div className={s.card}>Nenhuma pré-matrícula encontrada com estes filtros.</div>}
+                ) : (
+                  <p className={s.tableEmpty}>Nenhuma pré-matrícula encontrada com estes filtros.</p>
+                )}
+              </section>
+            ) : (
+              <>
+                <p className={s.muted}>{result.total} solicitação(ões)</p>
+                <div className={s.list}>
+                  {result.items.map((item) => (
+                    <Link className={s.card} href={`${path}/${item.id}`} key={item.id}>
+                      <div className={s.titleRow}>
+                        <h2>{item.studentName}</h2>
+                        <span className={s.pill}>{statusLabels[item.status]}</span>
+                      </div>
+                      <p className={s.muted}>
+                        {item.schoolUnit.name} · {item.course.title}
+                      </p>
+                      <p className={s.muted}>
+                        {item.protocol} ·{" "}
+                        {new Date(item.createdAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+                      </p>
+                      {item.feedback && <p className={s.notice}>{item.feedback}</p>}
+                      <span className={s.link}>{admin ? "Analisar solicitação" : "Ver solicitação"} →</span>
+                    </Link>
+                  ))}
+                </div>
+                {!result.items.length && (
+                  <div className={s.card}>Nenhuma pré-matrícula encontrada com estes filtros.</div>
+                )}
+              </>
+            )}
             <div className={s.actions}>
               <Button
                 variant="outline"

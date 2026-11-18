@@ -1,12 +1,17 @@
 "use client";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, type CSSProperties } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "@/components/gw/logo";
 import { Button } from "@/components/ui/button";
 import { Field, PasswordField, fetchJson } from "@/components/enrollment/fields";
-import s from "@/components/enrollment/enrollment.module.css";
+import { ArrowRight, ArrowUpRight, BookOpen, ClipboardCheck, Mail, MessagesSquare } from "lucide-react";
+import { DEFAULT_PREFS, themeVars } from "@/lib/theme";
+import s from "./login.module.css";
+
+// Public brand surface only; personal portal preferences are left untouched.
+const loginTheme = { ...themeVars(DEFAULT_PREFS), "--r": "22px" } as CSSProperties;
 function Login() {
   const router = useRouter();
   const params = useSearchParams();
@@ -47,73 +52,120 @@ function Login() {
     }
   }
   return (
-    <main className="gw-login">
-      <aside className="gw-login-brand">
-        <Logo variant="icon" white height={48} />
-        <div className="gw-login-brand-mid">
-          <p style={{ color: "#ffffffb8", letterSpacing: ".12em", fontSize: 11 }}>GET WISE · SPEAK ENGLISH</p>
-          <h1 style={{ color: "white", fontSize: 44, fontWeight: 800, lineHeight: 1.12, marginTop: 20 }}>
+    <main className={s.surface} style={loginTheme}>
+      <aside className={s.brand} aria-label="Get Wise">
+        <Logo white height={53} />
+        <div>
+          <h2>
             Um novo idioma.
             <br />
-            Mais possibilidades.
-          </h1>
-          <p style={{ color: "#ffffffb8", maxWidth: 370, marginTop: 24, lineHeight: 1.7 }}>
-            Seu espaço para aprender, acompanhar as aulas e se conectar com a Get Wise.
-          </p>
+            <span>Mais possibilidades.</span>
+          </h2>
+          <p className={s.brandCopy}>Seu espaço para aprender, acompanhar as aulas e se conectar com a Get Wise.</p>
+          <ul className={s.benefits}>
+            <li>
+              <BookOpen size={17} aria-hidden="true" />
+              Aulas e materiais
+            </li>
+            <li>
+              <MessagesSquare size={17} aria-hidden="true" />
+              Aprendizado e prática
+            </li>
+            <li>
+              <ClipboardCheck size={17} aria-hidden="true" />
+              Acompanhamento da pré-matrícula
+            </li>
+          </ul>
         </div>
-        <p style={{ color: "#ffffffb8" }}>Uma etapa de cada vez. A gente segue com você.</p>
+        <p className={s.brandFoot}>
+          Uma etapa de cada vez.
+          <br />A gente segue com você.
+        </p>
       </aside>
-      <section className="gw-login-form-wrap">
-        <div className="gw-login-form">
-          <Logo variant="icon" height={48} />
-          <h2 style={{ fontSize: 28, fontWeight: 800, marginTop: 24 }}>Bem-vindo de volta</h2>
-          <p className={s.muted}>Entre para estudar ou acompanhar sua pré-matrícula.</p>
-          <form
-            noValidate
-            onSubmit={(e) => {
-              e.preventDefault();
-              void enter();
-            }}
-            className={s.stack}
-            style={{ marginTop: 28 }}
-          >
-            <Field name="email" label="E-mail" value={email} onChange={setEmail} type="email" autoComplete="username" />
-            <PasswordField value={password} onChange={setPassword} />
-            <Link href="/forgot-password" className={s.link}>
-              Esqueci minha senha
-            </Link>
-            {params.get("verify") && (
-              <p role="status" className={s.notice}>
-                {params.get("verify") === "success"
-                  ? "E-mail confirmado. Você já pode entrar."
-                  : "O link não pôde ser confirmado. Entre na sua conta e solicite um novo envio no acompanhamento."}
-              </p>
-            )}
-            {error && (
-              <p role="alert" className={s.error}>
-                {error}
-              </p>
-            )}
-            <Button disabled={busy} type="submit">
-              {busy ? "Entrando…" : "Entrar no portal"}
-            </Button>
-          </form>
-          <p className={s.muted} style={{ marginTop: 28 }}>
-            Novo na escola?{" "}
-            <Link className={s.link} href="/register">
-              Fazer matrícula online
-            </Link>
-          </p>
-          {demo && (
-            <div className={s.notice}>
-              <p>Avaliação local</p>
-              <Button disabled={busy} variant="outline" onClick={() => enter(true)}>
-                Abrir painel administrativo
+      <div className={s.right}>
+        <header className={s.mobileHeader}>
+          <Logo white height={47} />
+          <span>
+            Seu portal
+            <br />
+            de aprendizado
+          </span>
+        </header>
+        <div className={s.access}>
+          <section className={s.card} aria-labelledby="login-title">
+            <p className={s.eyebrow}>Portal Get Wise</p>
+            <h1 id="login-title">Bem-vindo de volta</h1>
+            <p className={s.subtitle}>Entre para estudar ou acompanhar sua pré-matrícula.</p>
+            <form
+              noValidate
+              onSubmit={(e) => {
+                e.preventDefault();
+                void enter();
+              }}
+              className={s.form}
+              aria-describedby={error ? "login-error" : undefined}
+            >
+              <Field
+                name="email"
+                label="E-mail"
+                value={email}
+                onChange={setEmail}
+                type="email"
+                autoComplete="username"
+                className={s.field}
+                placeholder="seuemail@exemplo.com"
+                leadingIcon={<Mail size={17} />}
+              />
+              <PasswordField
+                value={password}
+                onChange={setPassword}
+                label="Senha"
+                compact
+                className={s.field}
+                labelAction={
+                  <Link href="/forgot-password" className={s.link}>
+                    Esqueci minha senha
+                  </Link>
+                }
+              />
+              {params.get("verify") && (
+                <p role="status" className={s.notice}>
+                  {params.get("verify") === "success"
+                    ? "E-mail confirmado. Você já pode entrar."
+                    : "O link não pôde ser confirmado. Entre na sua conta e solicite um novo envio no acompanhamento."}
+                </p>
+              )}
+              {error && (
+                <p id="login-error" role="alert" className={s.error}>
+                  {error}
+                </p>
+              )}
+              <Button disabled={busy} type="submit" className={s.primaryAction} aria-busy={busy}>
+                <span>{busy ? "Entrando…" : "Entrar no portal"}</span>
+                <ArrowRight size={17} aria-hidden="true" />
+              </Button>
+            </form>
+            <div className={s.newStudent}>
+              <p>Ainda não estuda com a gente?</p>
+              <Button asChild variant="outline" className={s.secondaryAction}>
+                <Link href="/register">
+                  Fazer matrícula online
+                  <ArrowUpRight size={17} aria-hidden="true" />
+                </Link>
               </Button>
             </div>
-          )}
+            {demo && (
+              <div className={s.notice}>
+                <p>Avaliação local</p>
+                <Button disabled={busy} variant="outline" onClick={() => enter(true)}>
+                  Abrir painel administrativo
+                </Button>
+              </div>
+            )}
+          </section>
+          <p className={s.footnote}>Get Wise — Speak English</p>
         </div>
-      </section>
+      </div>
     </main>
   );
 }

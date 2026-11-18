@@ -48,6 +48,8 @@ Solicitações expiram em 15 segundos. Repetir uma gravação já aplicada é id
 
 ## Pré-matrícula e unidades (17/11/2026)
 
+Acabamento administrativo: `enrollment/ReviewSection` é o componente de seções recolhíveis; os campos permanecem montados e os valores não são descartados ao fechar. `revealField` abre os ancestrais antes de focar um erro de validação. Busca e situação da lista de unidades são combinadas, reiniciam a paginação e podem ser limpas. A fila administrativa mantém os filtros na URL e paginação do servidor; a tabela vira blocos rotulados até 800 px, preservando status, observações e link de análise. As datas e ações de decisão existentes são mantidas. Nenhuma preferência de tema é gravada por essas telas. Regressões de filtro, erro em seção fechada e falha de salvamento são cobertas por `src/test/unit/enrollment-admin-design.test.tsx`.
+
 Fonte de negócio: `docs/MATRICULA-ONLINE-DESIGN.md` e aprovação do usuário para implementação local. O envio cria pré-matrícula PENDING; somente a secretaria com a seção `pre-enrollments` pode consultar a ficha completa e decidir. A conta APPLICANT fica restrita às próprias solicitações. Saúde e aprendizagem são exclusivamente do aluno. Dados sensíveis ficam no banco e no estado da tela, sem localStorage ou query string. O e-mail do responsável identifica a conta de acompanhamento de menores e pode ser compartilhado entre solicitações de irmãos.
 
 | Capability     | Canonical owner                                                             | Source of truth                                  | Allowed variants                                                          | Verification                   |
@@ -61,9 +63,11 @@ Associação curso/unidade usa o mesmo vínculo nas duas telas. Cursos inativos 
 
 Listas de pré-matrículas têm paginação de 20 itens e filtros na URL; nomes digitados na busca são a única informação pessoal em filtro, nunca CPF/saúde. Cadastro de unidades usa lista limitada a 200 e páginas locais de 12. Criação/edição usa validação própria, erros associados e foco no primeiro erro. Formulário público preserva os dados entre etapas, bloqueia envio duplo e avisa ao sair com dados não enviados. Falha de SMTP mantém o protocolo e informa que a confirmação não foi entregue. Não há notificação de decisão por WhatsApp/e-mail nesta etapa; a decisão aparece no acompanhamento.
 
-Visual: identidade existente, coluna lateral com etapas reais do processo, formulário com seções claras, uma coluna no celular. Sem tokens novos de cor ou fonte; CSS usa `theme.ts`/`globals.css`. Controles nativos preservam teclado e acessibilidade de plataforma.
+Visual: identidade existente, etapas reais acima do formulário, seções claras e uma coluna no celular. O acabamento aprovado usa cards compactos com cantos de 22 px, limitado ao módulo de matrícula. Ações longas quebram sem sair dos cards ou dos diálogos; campos em até 800 px usam 16 px e botões têm alvo mínimo de 44 px. Sem tokens novos de cor ou fonte; CSS usa `theme.ts`/`globals.css`. Controles nativos preservam teclado e acessibilidade de plataforma.
 
 Login usa e-mail e senha individuais. O botão de demonstração só existe quando `GETWISE_LOCAL_DEMO=1`, sem Vercel, em banco local `getwise_feature` e host loopback. O iniciador local configura essa condição para avaliação; produção não oferece esse acesso.
+
+Apresentação aprovada do login: card de 22 px, faixa móvel da marca, campos de 50 px com fonte de 16 px e ações de pelo menos 44 px. Mostrar/ocultar senha é um botão com nome acessível e estado pressionado; não envia o formulário. Recuperação de senha, matrícula, verificação de e-mail, mensagens de erro, bloqueio durante envio e destino interno após autenticação preservam seus fluxos. O tema público é restrito ao login e não grava preferências da conta.
 
 Verificação adicional: `src/test/unit/pre-enrollment-schema.test.ts`, `src/test/unit/pre-enrollment-form.test.tsx`, `src/test/integration/pre-enrollment.test.ts` e `scripts/test-pre-enrollment-local.mjs`. O script HTTP usa dados fictícios exclusivos por execução e remove seus registros ao final.
 

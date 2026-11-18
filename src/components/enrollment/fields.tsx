@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AppDialog } from "@/components/ui/app-dialog";
@@ -18,6 +19,11 @@ export function Field({
   optional = false,
   disabled = false,
   autoComplete,
+  className,
+  placeholder,
+  leadingIcon,
+  trailingControl,
+  labelAction,
 }: {
   name: string;
   label: string;
@@ -29,6 +35,11 @@ export function Field({
   optional?: boolean;
   disabled?: boolean;
   autoComplete?: string;
+  className?: string;
+  placeholder?: string;
+  leadingIcon?: ReactNode;
+  trailingControl?: ReactNode;
+  labelAction?: ReactNode;
 }) {
   const props = {
     id: name,
@@ -41,12 +52,22 @@ export function Field({
     "aria-describedby": error ? `${name}-error` : undefined,
     required: !optional,
   };
+  const fieldLabel = (
+    <label htmlFor={name}>
+      {label}
+      {optional ? " (opcional)" : " *"}
+    </label>
+  );
   return (
-    <div className={s.field}>
-      <label htmlFor={name}>
-        {label}
-        {optional ? " (opcional)" : " *"}
-      </label>
+    <div className={[s.field, className].filter(Boolean).join(" ")}>
+      {labelAction ? (
+        <div className={s.fieldLabelRow}>
+          {fieldLabel}
+          {labelAction}
+        </div>
+      ) : (
+        fieldLabel
+      )}
       {options ? (
         <select {...props}>
           <option value="">Selecione</option>
@@ -58,8 +79,24 @@ export function Field({
         </select>
       ) : type === "textarea" ? (
         <textarea className="resize-none" {...props} rows={4} />
+      ) : leadingIcon || trailingControl ? (
+        <div className={s.fieldControl}>
+          {leadingIcon && (
+            <span className={s.fieldIcon} aria-hidden="true">
+              {leadingIcon}
+            </span>
+          )}
+          <Input
+            {...props}
+            type={type}
+            autoComplete={autoComplete}
+            placeholder={placeholder}
+            style={{ paddingLeft: leadingIcon ? 42 : undefined, paddingRight: trailingControl ? 52 : undefined }}
+          />
+          {trailingControl && <span className={s.fieldTrailing}>{trailingControl}</span>}
+        </div>
       ) : (
-        <Input {...props} type={type} autoComplete={autoComplete} />
+        <Input {...props} type={type} autoComplete={autoComplete} placeholder={placeholder} />
       )}
       {error && (
         <span id={`${name}-error`} className={s.error}>
@@ -144,11 +181,17 @@ export function PasswordField({
   onChange,
   error,
   label = "Senha de acesso",
+  compact = false,
+  className,
+  labelAction,
 }: {
   value: string;
   onChange: (v: string) => void;
   error?: string;
   label?: string;
+  compact?: boolean;
+  className?: string;
+  labelAction?: ReactNode;
 }) {
   const [show, setShow] = useState(false);
   return (
@@ -161,10 +204,32 @@ export function PasswordField({
         type={show ? "text" : "password"}
         error={error}
         autoComplete="current-password"
+        className={className}
+        labelAction={labelAction}
+        placeholder={compact ? "Sua senha de acesso" : undefined}
+        leadingIcon={compact ? <LockKeyhole size={17} /> : undefined}
+        trailingControl={
+          compact ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              style={{ width: 44, height: 44 }}
+              onClick={() => setShow(!show)}
+              aria-pressed={show}
+              aria-controls="password"
+              aria-label={show ? "Ocultar senha" : "Mostrar senha"}
+            >
+              {show ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
+            </Button>
+          ) : undefined
+        }
       />
-      <Button type="button" size="sm" variant="ghost" onClick={() => setShow(!show)} aria-pressed={show}>
-        {show ? "Ocultar senha" : "Mostrar senha"}
-      </Button>
+      {!compact && (
+        <Button type="button" size="sm" variant="ghost" onClick={() => setShow(!show)} aria-pressed={show}>
+          {show ? "Ocultar senha" : "Mostrar senha"}
+        </Button>
+      )}
     </div>
   );
 }

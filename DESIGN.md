@@ -60,6 +60,10 @@ Hanken Grotesk é a família de títulos e corpo já adotada no produto; Spline 
 
 ## Layout
 
+Unidades e pré-matrículas administrativas seguem a organização da proposta aprovada: filtros dentro de card, identificação e contatos lado a lado no detalhe da unidade, tabela de solicitações no desktop e linhas empilhadas com rótulos no celular. `ReviewSection` mantém seções recolhíveis nativas; identificação, contatos e cursos começam abertos, informações complementares fechadas. Cores continuam herdadas do tema da conta. As alterações ficam restritas às novas áreas administrativas, preservando a apresentação pública e as demais telas.
+
+Pré-matrícula, unidades e análise: acabamento aprovado com espaçamento compacto (20 px nos cards) e cantos de 22 px, restrito a `components/enrollment/enrollment.module.css`. As etapas ficam acima do formulário e os campos passam a uma coluna no celular. Até 800 px, campos usam 16 px e ações têm área de toque mínima de 44 px; rótulos longos quebram dentro do botão, inclusive nos diálogos. Os tokens de cor e fonte e as demais telas continuam compartilhados, sem alteração.
+
 Preferências: formulário de largura flexível com prévia lateral; abaixo de 850 px, uma coluna com rolagem natural do documento. Não impor altura de viewport ao formulário. O shell e seu menu móvel continuam sendo compartilhados. As ações ficam no final do formulário, sem encobrir campos ou teclado.
 
 ## Elevation & Depth
@@ -71,6 +75,8 @@ Cards brancos, bordas suaves e separação por espaçamento. Manter a elevação
 Cantos padrão de 16 px, controles de 10 px e agrupamentos de 22 px. O aluno pode selecionar 10, 16 ou 22 px; os derivados vêm de `themeVars`. Amostras de cor são círculos; controles permanecem reconhecíveis como rádio, botão ou campo.
 
 ## Components
+
+Login público: proposta aprovada com espaçamento confortável (30 px), card de 22 px e paleta Marinho de `themeVars(DEFAULT_PREFS)` aplicada apenas à superfície de login. Desktop tem painel institucional; até 700 px usa faixa compacta com a marca e formulário em uma coluna. Até 360 px o card reduz seu preenchimento para 22 × 18 px. Estilos pertencem a `app/(auth)/login/login.module.css`; não alteram preferências pessoais ou demais telas. Campos e botões continuam nos componentes compartilhados, com ícones e senha compacta opcionais.
 
 `ui/Button` e `ui/Input` são os donos dos controles básicos. `PreferenceChoices` é o grupo de rádios para opções curtas, com rótulos visíveis e navegação nativa por teclado. O componente não é um dropdown. Feedback de salvamento é persistente na tela, com região viva; erros não dependem de toast.
 

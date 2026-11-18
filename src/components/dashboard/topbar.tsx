@@ -12,6 +12,9 @@ import { LogOut, Menu } from "lucide-react";
 import { usePreferences } from "@/components/preferences/preferences-provider";
 
 const TITLES: Record<string, { title: string; sub?: string }> = {
+  "/admin/school-units": { title: "Unidades", sub: "Unidades físicas e cursos oferecidos" },
+  "/admin/school-units/new": { title: "Nova unidade" },
+  "/admin/pre-enrollments": { title: "Pré-matrículas", sub: "Solicitações recebidas pela secretaria" },
   "/admin": { title: "Dashboard", sub: "Visão geral do mês" },
   "/admin/students": { title: "Alunos", sub: "Gestão de alunos cadastrados" },
   "/admin/students/new": { title: "Novo Aluno", sub: "Cadastrar aluno no sistema" },
@@ -56,7 +59,15 @@ export function Topbar({ previewRole }: { previewRole?: string } = {}) {
   // Papel da visão atual (previewRole quando admin "vendo como" aluno/professor).
   const role = previewRole || realRole || "STUDENT";
 
-  const meta = TITLES[pathname] || { title: "Get Wise" };
+  const meta =
+    TITLES[pathname] ||
+    (/^\/admin\/school-units\/[^/]+\/edit$/.test(pathname)
+      ? { title: "Editar unidade" }
+      : /^\/admin\/school-units\/[^/]+$/.test(pathname)
+        ? { title: "Detalhe da unidade" }
+        : /^\/admin\/pre-enrollments\/[^/]+$/.test(pathname)
+          ? { title: "Analisar solicitação" }
+          : { title: "Get Wise" });
   const eyebrow =
     role === "ADMIN" ? "Painel administrativo" : role === "TEACHER" ? "Portal do professor" : "Portal do aluno";
 

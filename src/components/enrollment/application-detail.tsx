@@ -7,6 +7,7 @@ import { ApplicationData, isMinor, statusLabels } from "@/lib/pre-enrollment/sch
 import { EnrollmentForm } from "./enrollment-form";
 import { Field, PersonSummary, fetchJson } from "./fields";
 import s from "./enrollment.module.css";
+import { ReviewSection } from "./review-section";
 type Entry = {
   id: string;
   version: number;
@@ -104,50 +105,48 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
                 <Button onClick={() => setEditing(true)}>Corrigir e reenviar</Button>
               )}
               <div className={s.stack} style={{ marginTop: 24 }}>
-                <section className={s.card}>
-                  <h2>Aluno</h2>
-                  <PersonSummary person={entry.data.student} />
-                </section>
-                {isMinor(entry.data.student.birthDate) && entry.data.guardian && (
-                  <section className={s.card}>
-                    <h2>Responsável · {entry.data.relationship}</h2>
-                    <PersonSummary person={entry.data.guardian} />
-                  </section>
-                )}
-                <section className={s.card}>
-                  <h2>Cuidados com o aluno</h2>
-                  <dl className={s.summary}>
-                    <div>
-                      <dt>Alergias</dt>
-                      <dd>{entry.data.allergies === "YES" ? entry.data.allergyDetails : "Não"}</dd>
-                    </div>
-                    <div>
-                      <dt>Aprendizagem/desenvolvimento</dt>
-                      <dd>{entry.data.learningNeeds || "Não informado"}</dd>
-                    </div>
-                  </dl>
-                </section>
-                <section className={s.card}>
-                  <h2>Atendimento e chegada</h2>
-                  <dl className={s.summary}>
-                    <div>
-                      <dt>Consultor</dt>
-                      <dd>{entry.data.consultant}</dd>
-                    </div>
-                    <div>
-                      <dt>Como conheceu a escola</dt>
-                      <dd>{entry.data.source}</dd>
-                    </div>
-                    <div>
-                      <dt>O que mais gostou</dt>
-                      <dd>{entry.data.favorite}</dd>
-                    </div>
-                    <div>
-                      <dt>E-mail de acesso</dt>
-                      <dd>{entry.applicant.emailVerified ? "Confirmado" : "Aguardando confirmação"}</dd>
-                    </div>
-                  </dl>
-                </section>
+                <div className={admin ? s.card : s.stack}>
+                  <ReviewSection title="Aluno" initiallyOpen collapsible={admin}>
+                    <PersonSummary person={entry.data.student} />
+                  </ReviewSection>
+                  {isMinor(entry.data.student.birthDate) && entry.data.guardian && (
+                    <ReviewSection title={`Responsável · ${entry.data.relationship}`} initiallyOpen collapsible={admin}>
+                      <PersonSummary person={entry.data.guardian} />
+                    </ReviewSection>
+                  )}
+                  <ReviewSection title="Cuidados com o aluno" collapsible={admin}>
+                    <dl className={s.summary}>
+                      <div>
+                        <dt>Alergias</dt>
+                        <dd>{entry.data.allergies === "YES" ? entry.data.allergyDetails : "Não"}</dd>
+                      </div>
+                      <div>
+                        <dt>Aprendizagem/desenvolvimento</dt>
+                        <dd>{entry.data.learningNeeds || "Não informado"}</dd>
+                      </div>
+                    </dl>
+                  </ReviewSection>
+                  <ReviewSection title="Atendimento e chegada" collapsible={admin}>
+                    <dl className={s.summary}>
+                      <div>
+                        <dt>Consultor</dt>
+                        <dd>{entry.data.consultant}</dd>
+                      </div>
+                      <div>
+                        <dt>Como conheceu a escola</dt>
+                        <dd>{entry.data.source}</dd>
+                      </div>
+                      <div>
+                        <dt>O que mais gostou</dt>
+                        <dd>{entry.data.favorite}</dd>
+                      </div>
+                      <div>
+                        <dt>E-mail de acesso</dt>
+                        <dd>{entry.applicant.emailVerified ? "Confirmado" : "Aguardando confirmação"}</dd>
+                      </div>
+                    </dl>
+                  </ReviewSection>
+                </div>
                 {admin && ["PENDING", "CORRECTION"].includes(entry.status) && (
                   <section className={s.card}>
                     <h2>Análise da secretaria</h2>

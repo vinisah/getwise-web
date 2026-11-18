@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SchoolUnitSchema } from "@/lib/pre-enrollment/schema";
 import { Field, ExitLink, fetchJson, type Errors } from "./fields";
 import s from "./enrollment.module.css";
+import { ReviewSection, revealField } from "./review-section";
 export type SchoolData = z.infer<typeof SchoolUnitSchema>;
 type Unit = SchoolData & { id: string; version: number; courses: { course: { id: string; title: string } }[] };
 const blank: SchoolData = {
@@ -46,7 +47,7 @@ const groups: { label: string; fields: [keyof SchoolData, string][] }[] = [
     ],
   },
   {
-    label: "Endereço",
+    label: "Endereço e contatos",
     fields: [
       ["zipCode", "CEP"],
       ["address", "Logradouro"],
@@ -55,11 +56,6 @@ const groups: { label: string; fields: [keyof SchoolData, string][] }[] = [
       ["neighborhood", "Bairro"],
       ["city", "Cidade"],
       ["state", "Estado (UF)"],
-    ],
-  },
-  {
-    label: "Contato",
-    fields: [
       ["phone", "Telefone fixo"],
       ["mobile", "Celular"],
       ["email", "E-mail"],
@@ -71,6 +67,7 @@ export function SchoolUnitList() {
   const [loadedReload, setLoadedReload] = useState(-1);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
   const loading = loadedReload !== reload;
@@ -86,22 +83,24 @@ export function SchoolUnitList() {
       });
     return () => ctrl.abort();
   }, [reload]);
-  const filtered = units.filter((u) =>
-    `${u.name} ${u.city} ${u.code}`.toLocaleLowerCase("pt-BR").includes(search.toLocaleLowerCase("pt-BR"))
+  const filtered = units.filter(
+    (u) =>
+      (!status || (status === "active") === u.isActive) &&
+      `${u.name} ${u.city} ${u.code}`.toLocaleLowerCase("pt-BR").includes(search.toLocaleLowerCase("pt-BR"))
   );
   return (
     <div className={s.wide}>
       <div className={s.titleRow}>
         <div>
           <p className={s.eyebrow}>Get Wise · Unidades</p>
-          <h1 style={{ fontSize: 30, fontWeight: 800 }}>Onde o aprendizado acontece</h1>
+          <h1 style={{ fontSize: 30, fontWeight: 800 }}>Unidades</h1>
           <p className={s.muted}>Cadastre as unidades e defina os cursos disponíveis para matrícula.</p>
         </div>
         <Button asChild>
           <Link href="/admin/school-units/new">Cadastrar unidade</Link>
         </Button>
       </div>
-      <div className={s.toolbar}>
+      <div className={`${s.card} ${s.filterPanel}`}>
         <Field
           name="searchUnits"
           label="Buscar unidade"
@@ -112,16 +111,31 @@ export function SchoolUnitList() {
             setPage(1);
           }}
         />
-        {search && (
+        <Field
+          name="unitStatus"
+          label="Situação"
+          optional
+          value={status}
+          onChange={(v) => {
+            setStatus(v);
+            setPage(1);
+          }}
+          options={[
+            { value: "active", label: "Ativas" },
+            { value: "inactive", label: "Inativas" },
+          ]}
+        />
+        {(search || status) && (
           <Button
             variant="ghost"
             onClick={() => {
               setSearch("");
+              setStatus("");
               setPage(1);
               document.getElementById("searchUnits")?.focus();
             }}
           >
-            Limpar busca
+            Limpar filtros
           </Button>
         )}
       </div>
@@ -142,24 +156,59 @@ export function SchoolUnitList() {
       ) : (
         <>
           <p className={s.muted}>{filtered.length} unidade(s)</p>
-          <div className={s.list}>
-            {filtered.slice((page - 1) * 12, page * 12).map((u) => (
-              <Link className={s.card} key={u.id} href={`/admin/school-units/${u.id}`}>
-                <div className={s.titleRow}>
-                  <h2>{u.name}</h2>
-                  <span className={s.pill}>
-                    {u.isActive && u.enrollmentOpen ? "Matrículas abertas" : "Indisponível para matrícula"}
-                  </span>
-                </div>
-                <p className={s.muted}>
-                  {u.city} / {u.state} · Unidade {u.code}
-                </p>
-                <p>{u.courses.map((c) => c.course.title).join(" · ") || "Nenhum curso vinculado"}</p>
-                <span className={s.link}>Ver unidade →</span>
-              </Link>
-            ))}
+          <div className={s.card}>
+            {filtered.length ? (
+              <div className={s.tableWrap}>
+                <table className={s.reviewTable} role="table" aria-label="Unidades cadastradas">
+                  <thead>
+                    <tr>
+                      <th scope="col">Unidade</th>
+                      <th scope="col">Situação</th>
+                      <th scope="col">Oferta online</th>
+                      <th scope="col">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.slice((page - 1) * 12, page * 12).map((u) => (
+                      <tr key={u.id}>
+                        <td data-label="Unidade">
+                          <strong>{u.name}</strong>
+                          <small>
+                            {u.city} / {u.state} · Unidade {u.code}
+                          </small>
+                        </td>
+                        <td data-label="Situação">
+                          <span className={s.pill}>{u.isActive ? "Ativa" : "Inativa"}</span>
+                        </td>
+                        <td data-label="Oferta online">
+                          <span className={s.pill}>
+                            {u.isActive && u.enrollmentOpen ? "Matrículas abertas" : "Indisponível para matrícula"}
+                          </span>
+                          <small>{u.courses.map((c) => c.course.title).join(" · ") || "Nenhum curso vinculado"}</small>
+                        </td>
+                        <td data-label="Ações">
+                          <div className={s.tableActions}>
+                            <Button asChild variant="outline">
+                              <Link href={"/admin/school-units/" + u.id} aria-label={"Detalhes de " + u.name}>
+                                Detalhes
+                              </Link>
+                            </Button>
+                            <Button asChild variant="ghost">
+                              <Link href={"/admin/school-units/" + u.id + "/edit"} aria-label={"Editar " + u.name}>
+                                Editar
+                              </Link>
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className={s.tableEmpty}>Nenhuma unidade encontrada.</p>
+            )}
           </div>
-          {!filtered.length && <div className={s.card}>Nenhuma unidade encontrada.</div>}
           <div className={s.actions}>
             <Button variant="outline" disabled={page === 1} onClick={() => setPage(page - 1)}>
               Anterior
@@ -207,7 +256,7 @@ export function SchoolUnitEditor({ initial }: { initial?: Unit }) {
       const map = Object.fromEntries(parsed.error.issues.map((i) => [i.path.join("."), i.message]));
       setErrors(map);
       setError("Confira os campos indicados.");
-      requestAnimationFrame(() => document.getElementById(Object.keys(map)[0])?.focus());
+      requestAnimationFrame(() => revealField(Object.keys(map)[0]));
       return;
     }
     setBusy(true);
@@ -233,165 +282,171 @@ export function SchoolUnitEditor({ initial }: { initial?: Unit }) {
           Voltar às unidades
         </ExitLink>
       </div>
-      <form noValidate onSubmit={save} className={s.card} style={{ marginTop: 24 }}>
-        <fieldset disabled={busy} style={{ border: 0, padding: 0, minWidth: 0 }}>
-          {groups.map((g) => (
-            <fieldset className={s.section} key={g.label}>
-              <legend>{g.label}</legend>
-              <div className={s.grid}>
-                {g.fields.map(([key, label]) => (
-                  <Field
-                    key={key}
-                    name={key}
-                    label={label}
-                    value={String(data[key])}
-                    onChange={(v) => update(key, v)}
-                    error={errors[key]}
-                    optional={!["code", "name", "legalName", "city", "state", "email"].includes(key)}
-                    type={key === "email" ? "email" : "text"}
-                  />
-                ))}
-              </div>
-            </fieldset>
-          ))}
-          <fieldset className={s.section}>
-            <legend>Disponibilidade e cursos</legend>
-            <div className={s.checks}>
-              <label>
-                <input type="checkbox" checked={data.isActive} onChange={(e) => update("isActive", e.target.checked)} />
-                Unidade ativa
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={data.enrollmentOpen}
-                  onChange={(e) => update("enrollmentOpen", e.target.checked)}
-                />
-                Receber pré-matrículas online
-              </label>
-            </div>
-            <p className={s.muted}>
-              Selecione os cursos oferecidos. Cursos inativos não aparecem no formulário público.
-            </p>
-            <div className={s.checks}>
-              {courses.map((c) => (
-                <label key={c.id}>
-                  <input
-                    type="checkbox"
-                    checked={data.courseIds.includes(c.id)}
-                    onChange={(e) =>
-                      update(
-                        "courseIds",
-                        e.target.checked ? [...data.courseIds, c.id] : data.courseIds.filter((id) => id !== c.id)
-                      )
-                    }
-                  />
-                  {c.title}
-                  {!c.isActive && " (inativo)"}
-                </label>
-              ))}
-            </div>
-            {!courses.length && <p>Nenhum curso carregado. Cadastre os cursos na seção Cursos.</p>}
-          </fieldset>
-          <fieldset className={s.section}>
-            <legend>Consultores e informações complementares</legend>
-            <div className={s.stack}>
-              <Field
-                name="consultants"
-                label="Consultores (um por linha)"
-                type="textarea"
-                value={data.consultants.join("\n")}
-                onChange={(v) => update("consultants", v.split("\n"))}
-              />
-              <Field
-                name="notes"
-                label="Informações complementares"
-                type="textarea"
-                optional
-                value={data.notes}
-                onChange={(v) => update("notes", v)}
-              />
-            </div>
-          </fieldset>
-          <fieldset className={s.section}>
-            <legend>Imagens da unidade</legend>
-            <p className={s.muted}>Informe endereços HTTPS das imagens já hospedadas.</p>
-            <div className={s.stack}>
-              <Field
-                name="logoUrl"
-                label="Endereço do logo"
-                type="url"
-                optional
-                value={data.logoUrl}
-                onChange={(v) => update("logoUrl", v)}
-                error={errors.logoUrl}
-              />
-              <Field
-                name="photos"
-                label="Endereços das fotos (um por linha)"
-                type="textarea"
-                optional
-                value={data.photos.join("\n")}
-                onChange={(v) => update("photos", v ? v.split("\n") : [])}
-                error={Object.entries(errors).find(([k]) => k.startsWith("photos"))?.[1]}
-              />
-            </div>
-          </fieldset>
-          <fieldset className={s.section}>
-            <legend>Sócios</legend>
-            {data.partners.map((p, i) => (
-              <div key={i} className={s.card} style={{ marginBottom: 12 }}>
+      <p className={s.muted}>Cadastro administrativo da unidade física.</p>
+      <form noValidate onSubmit={save} style={{ marginTop: 24 }}>
+        <div className={s.card}>
+          <fieldset disabled={busy} style={{ border: 0, padding: 0, minWidth: 0 }}>
+            {groups.map((g) => (
+              <ReviewSection title={g.label} initiallyOpen key={g.label}>
                 <div className={s.grid}>
-                  {(
-                    [
-                      ["name", "Nome"],
-                      ["birthDate", "Data de nascimento"],
-                      ["document", "Documento"],
-                      ["photoUrl", "Endereço HTTPS da foto"],
-                    ] as const
-                  ).map(([k, label]) => (
+                  {g.fields.map(([key, label]) => (
                     <Field
-                      key={k}
-                      name={`partners.${i}.${k}`}
+                      key={key}
+                      name={key}
                       label={label}
-                      optional={k !== "name"}
-                      type={k === "birthDate" ? "date" : "text"}
-                      value={p[k]}
-                      onChange={(v) =>
-                        update(
-                          "partners",
-                          data.partners.map((x, ix) => (ix === i ? { ...x, [k]: v } : x))
-                        )
-                      }
-                      error={errors[`partners.${i}.${k}`]}
+                      value={String(data[key])}
+                      onChange={(v) => update(key, v)}
+                      error={errors[key]}
+                      optional={!["code", "name", "legalName", "city", "state", "email"].includes(key)}
+                      type={key === "email" ? "email" : "text"}
                     />
                   ))}
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() =>
-                    update(
-                      "partners",
-                      data.partners.filter((_, ix) => ix !== i)
-                    )
-                  }
-                >
-                  Remover sócio deste formulário
-                </Button>
-              </div>
+                {g.label === "Identificação" && (
+                  <>
+                    <div className={s.checks}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={data.isActive}
+                          onChange={(e) => update("isActive", e.target.checked)}
+                        />
+                        Unidade ativa
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={data.enrollmentOpen}
+                          onChange={(e) => update("enrollmentOpen", e.target.checked)}
+                        />
+                        Receber pré-matrículas online
+                      </label>
+                    </div>
+                  </>
+                )}
+              </ReviewSection>
             ))}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                update("partners", [...data.partners, { name: "", birthDate: "", document: "", photoUrl: "" }])
-              }
-            >
-              Adicionar sócio
-            </Button>
+            <ReviewSection title="Cursos oferecidos" initiallyOpen>
+              <p className={s.muted}>
+                Selecione os cursos oferecidos. Cursos inativos não aparecem no formulário público.
+              </p>
+              <div className={s.checks}>
+                {courses.map((c) => (
+                  <label key={c.id}>
+                    <input
+                      type="checkbox"
+                      checked={data.courseIds.includes(c.id)}
+                      onChange={(e) =>
+                        update(
+                          "courseIds",
+                          e.target.checked ? [...data.courseIds, c.id] : data.courseIds.filter((id) => id !== c.id)
+                        )
+                      }
+                    />
+                    {c.title}
+                    {!c.isActive && " (inativo)"}
+                  </label>
+                ))}
+              </div>
+              {!courses.length && <p>Nenhum curso carregado. Cadastre os cursos na seção Cursos.</p>}
+            </ReviewSection>
+            <ReviewSection title="Consultores e observações">
+              <div className={s.stack}>
+                <Field
+                  name="consultants"
+                  label="Consultores (um por linha)"
+                  type="textarea"
+                  value={data.consultants.join("\n")}
+                  onChange={(v) => update("consultants", v.split("\n"))}
+                />
+                <Field
+                  name="notes"
+                  label="Informações complementares"
+                  type="textarea"
+                  optional
+                  value={data.notes}
+                  onChange={(v) => update("notes", v)}
+                />
+              </div>
+            </ReviewSection>
+            <ReviewSection title="Logo e fotos">
+              <p className={s.muted}>Informe endereços HTTPS das imagens já hospedadas.</p>
+              <div className={s.stack}>
+                <Field
+                  name="logoUrl"
+                  label="Endereço do logo"
+                  type="url"
+                  optional
+                  value={data.logoUrl}
+                  onChange={(v) => update("logoUrl", v)}
+                  error={errors.logoUrl}
+                />
+                <Field
+                  name="photos"
+                  label="Endereços das fotos (um por linha)"
+                  type="textarea"
+                  optional
+                  value={data.photos.join("\n")}
+                  onChange={(v) => update("photos", v ? v.split("\n") : [])}
+                  error={Object.entries(errors).find(([k]) => k.startsWith("photos"))?.[1]}
+                />
+              </div>
+            </ReviewSection>
+            <ReviewSection title="Sócios">
+              {data.partners.map((p, i) => (
+                <div key={i} className={s.card} style={{ marginBottom: 12 }}>
+                  <div className={s.grid}>
+                    {(
+                      [
+                        ["name", "Nome"],
+                        ["birthDate", "Data de nascimento"],
+                        ["document", "Documento"],
+                        ["photoUrl", "Endereço HTTPS da foto"],
+                      ] as const
+                    ).map(([k, label]) => (
+                      <Field
+                        key={k}
+                        name={`partners.${i}.${k}`}
+                        label={label}
+                        optional={k !== "name"}
+                        type={k === "birthDate" ? "date" : "text"}
+                        value={p[k]}
+                        onChange={(v) =>
+                          update(
+                            "partners",
+                            data.partners.map((x, ix) => (ix === i ? { ...x, [k]: v } : x))
+                          )
+                        }
+                        error={errors[`partners.${i}.${k}`]}
+                      />
+                    ))}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() =>
+                      update(
+                        "partners",
+                        data.partners.filter((_, ix) => ix !== i)
+                      )
+                    }
+                  >
+                    Remover sócio deste formulário
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  update("partners", [...data.partners, { name: "", birthDate: "", document: "", photoUrl: "" }])
+                }
+              >
+                Adicionar sócio
+              </Button>
+            </ReviewSection>
           </fieldset>
-        </fieldset>
+        </div>
         {error && (
           <p role="alert" className={s.error}>
             {error}
@@ -426,37 +481,53 @@ export function SchoolUnitDetail({ unit }: { unit: Unit }) {
           <Link href={`/admin/school-units/${unit.id}/edit`}>Editar unidade</Link>
         </Button>
       </div>
+      <div className={s.detailBadges}>
+        <span className={s.pill}>{unit.isActive ? "Ativa" : "Inativa"}</span>
+        <span className={s.pill}>
+          {unit.enrollmentOpen && unit.isActive ? "Matrícula online disponível" : "Matrícula online pausada"}
+        </span>
+      </div>
       <div className={s.stack}>
-        {groups.map((g) => (
-          <section key={g.label} className={s.card}>
-            <h2>{g.label}</h2>
-            <dl className={s.summary}>
-              {g.fields.map(([k, label]) => (
-                <div key={k}>
-                  <dt>{label}</dt>
-                  <dd>{String(unit[k] || "Não informado")}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        ))}
+        <div className={s.detailGrid}>
+          {groups.map((g) => (
+            <section key={g.label} className={s.card}>
+              <h2>{g.label}</h2>
+              <dl className={s.summary}>
+                {g.fields.map(([k, label]) => (
+                  <div key={k}>
+                    <dt>{label}</dt>
+                    <dd>{String(unit[k] || "Não informado")}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ))}
+        </div>
         <section className={s.card}>
-          <h2>Cursos oferecidos</h2>
+          <div className={s.titleRow}>
+            <h2>Cursos oferecidos</h2>
+            <Button asChild variant="ghost">
+              <Link href="/admin/courses">Ver cursos</Link>
+            </Button>
+          </div>
           <p className={s.muted}>
             {unit.enrollmentOpen ? "Pré-matrículas online abertas" : "Pré-matrículas online fechadas"}
           </p>
           {unit.courses.map((c) => (
-            <p key={c.course.id}>{c.course.title}</p>
+            <div className={s.courseRow} key={c.course.id}>
+              <strong>{c.course.title}</strong>
+            </div>
           ))}
           {!unit.courses.length && <p>Nenhum curso vinculado.</p>}
         </section>
         <section className={s.card}>
-          <h2>Informações complementares</h2>
-          <p>{unit.notes || "Não informado"}</p>
-          <p>Consultores: {unit.consultants.join(" · ")}</p>
-          <p>
-            {unit.partners.length} sócio(s) · {unit.photos.length} foto(s)
-          </p>
+          <ReviewSection title="Informações administrativas complementares">
+            <p>{unit.notes || "Não informado"}</p>
+            <p>Consultores: {unit.consultants.join(" · ")}</p>
+            <p>
+              {unit.partners.length} sócio(s) · {unit.photos.length} foto(s)
+            </p>
+          </ReviewSection>
         </section>
       </div>
     </div>
