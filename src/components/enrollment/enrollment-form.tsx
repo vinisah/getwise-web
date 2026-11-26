@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, MapPin } from "lucide-react";
 import { Logo } from "@/components/gw/logo";
 import { Button } from "@/components/ui/button";
+import { PRE_ENROLLMENT_LOGIN, PRE_ENROLLMENT_PATH } from "@/lib/pre-enrollment/access";
 import {
   ApplicationSchema,
   PersonSchema,
@@ -179,7 +180,7 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
               )}
               <div className={s.actions}>
                 <Button asChild>
-                  <Link href={correction ? "/pre-enrollments" : "/login?callbackUrl=/pre-enrollments"}>
+                  <Link href={correction ? PRE_ENROLLMENT_PATH : PRE_ENROLLMENT_LOGIN}>
                     Acompanhar pré-matrícula <ArrowRight size={16} />
                   </Link>
                 </Button>

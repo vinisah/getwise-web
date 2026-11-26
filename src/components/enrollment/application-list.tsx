@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/gw/logo";
 import { statusLabels } from "@/lib/pre-enrollment/schema";
+import { PRE_ENROLLMENT_LOGIN } from "@/lib/pre-enrollment/access";
 import { Field, fetchJson } from "./fields";
 import s from "./enrollment.module.css";
 type Item = {
@@ -21,7 +22,7 @@ type Item = {
 function List({ admin }: { admin: boolean }) {
   const router = useRouter();
   const search = useSearchParams();
-  const [result, setResult] = useState<{ items: Item[]; total: number; page: number }>({
+  const [result, setResult] = useState<{ items: Item[]; total: number; page: number; accountEmail?: string }>({
     items: [],
     total: 0,
     page: 1,
@@ -35,6 +36,7 @@ function List({ admin }: { admin: boolean }) {
   const searchString = search.toString();
   const requestKey = `${searchString}:${admin}:${reload}`;
   const loading = loadedFor !== requestKey;
+  const hasFilters = ["q", "status", "unit", "course", "from", "to"].some((key) => search.get(key));
   const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
   const [courses, setCourses] = useState<{ id: string; title: string }[]>([]);
   useEffect(() => {
@@ -71,6 +73,13 @@ function List({ admin }: { admin: boolean }) {
       });
     return () => ctrl.abort();
   }, [searchString, admin, requestKey]);
+  async function leaveTracking() {
+    try {
+      await signOut({ callbackUrl: PRE_ENROLLMENT_LOGIN });
+    } catch {
+      setError("Não foi possível sair. Tente novamente.");
+    }
+  }
   const path = admin ? "/admin/pre-enrollments" : "/pre-enrollments";
   function filter(k: string, v: string) {
     const next = new URLSearchParams(searchString);
@@ -84,7 +93,7 @@ function List({ admin }: { admin: boolean }) {
       {!admin && (
         <header className={s.header}>
           <Logo height={40} />
-          <Button variant="ghost" onClick={() => signOut({ callbackUrl: "/login" })}>
+          <Button variant="ghost" onClick={leaveTracking}>
             Sair da conta
           </Button>
         </header>
@@ -106,6 +115,18 @@ function List({ admin }: { admin: boolean }) {
             </Button>
           )}
         </div>
+        {!admin && !loading && !error && (
+          <div className={s.notice}>
+            <p>
+              {result.accountEmail
+                ? `Conta de acompanhamento: ${result.accountEmail}`
+                : "Suas solicitações aparecem nesta conta."}
+            </p>
+            <Button variant="link" onClick={leaveTracking}>
+              Entrar com outro e-mail
+            </Button>
+          </div>
+        )}
         <form
           noValidate
           className={admin ? `${s.card} ${s.filterPanel}` : s.toolbar}
@@ -283,11 +304,23 @@ function List({ admin }: { admin: boolean }) {
                   ))}
                 </div>
                 {!result.items.length && (
-                  <div className={s.card}>Nenhuma pré-matrícula encontrada com estes filtros.</div>
+                  <div className={s.card}>
+                    {hasFilters || result.page > 1 ? (
+                      <p>Nenhuma pré-matrícula encontrada com estes filtros.</p>
+                    ) : (
+                      <>
+                        <h2>Nenhuma pré-matrícula vinculada a esta conta</h2>
+                        <p className={s.muted}>
+                          Se você já enviou o formulário, entre com o mesmo e-mail usado no cadastro. Para menores de 18
+                          anos, o acesso é pelo e-mail do responsável.
+                        </p>
+                      </>
+                    )}
+                  </div>
                 )}
               </>
             )}
-            <div className={s.actions}>
+            <nav className={`${s.actions} ${s.pagination}`} aria-label="Paginação de pré-matrículas">
               <Button
                 variant="outline"
                 disabled={result.page <= 1}
@@ -311,7 +344,7 @@ function List({ admin }: { admin: boolean }) {
               >
                 Próxima
               </Button>
-            </div>
+            </nav>
           </>
         )}
         {!admin && (
