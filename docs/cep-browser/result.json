@@ -1,0 +1,24 @@
+{
+  "checks": [
+    "seleção-de-unidade-por-teclado",
+    "01-unidades-da-cidade-desktop",
+    "02-unidades-da-cidade-320",
+    "03-pedido-outra-cidade-320",
+    "04-pendente-320",
+    "05-acompanhamento-pendente-320",
+    "06-secretaria-sem-decisao",
+    "07-direcao-confirmacao",
+    "08-excecao-autorizada-320",
+    "09-retomada-formulario-320",
+    "sem-excecoes-JavaScript",
+    "CEP-real-server-side",
+    "direcao-secretaria-isoladas"
+  ],
+  "applicationId": "cmwy7a8920001v4u51no49uqp",
+  "fixtureEmail": "browser-cep-1795736727929@example.invalid",
+  "evidence": "Chrome headless, banco exclusivo local; resposta real do ViaCEP",
+  "viewport": [
+    1366,
+    320
+  ]
+}

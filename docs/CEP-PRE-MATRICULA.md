@@ -48,4 +48,6 @@ Migração aditiva em `20261126010000_enrollment_cep`. O runner segue a convenç
 
 Banco de revisão exclusivo: `getwise_cep_test` em loopback:55432. Testes reais exigem `RUN_CEP_DATABASE_TESTS=1`; fixture e cleanup usam identificadores próprios. Nenhum dado real é usado.
 
-Resultados iniciais: 15 testes de consulta/domínio em PostgreSQL e 23 testes de formulário, autenticação e APIs existentes passaram. A revisão final, build, migração de legado e matriz ampliada de navegador serão registrados no próximo commit.
+Resultados iniciais: 15 testes de consulta/domínio em PostgreSQL e 23 testes de formulário, autenticação e APIs existentes passaram. O fechamento das evidências está em `CEP-EVIDENCIAS.md`.
+
+A regularização também aceita fichas **APPROVED** ainda não efetivadas: a secretaria solicita ajustes com motivo obrigatório, a família edita e o envio retorna à análise. Fichas **ENROLLED** não são reabertas por essa ação.

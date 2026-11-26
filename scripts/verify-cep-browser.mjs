@@ -20,9 +20,12 @@ async function screenshot(page, file) {
 }
 async function login(context, email, password) {
   const { csrfToken } = await (await context.request.get(`${base}/api/auth/csrf`)).json();
-  await context.request.post(`${base}/api/auth/callback/credentials`, {
+  const response = await context.request.post(`${base}/api/auth/callback/credentials`, {
     form: { csrfToken, email, password, callbackUrl: `${base}/pre-enrollments`, json: "true" },
   });
+  assert.equal(response.status(), 200, "Login deve responder sem erro do servidor");
+  const session = await (await context.request.get(`${base}/api/auth/session`)).json();
+  assert.equal(session.user?.email, email, "Sessão deve pertencer à conta informada");
 }
 try {
   const family = await browser.newContext({ viewport: { width: 1366, height: 900 } });
@@ -37,6 +40,11 @@ try {
   await page.getByRole("button", { name: "Consultar CEP", exact: true }).click();
   await page.getByRole("radio", { name: /^Get Wise Marechal Marechal/ }).waitFor({ timeout: 20000 });
   assert.equal(await page.getByRole("radio").count(), 2);
+  await page.getByRole("radio").first().focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("ArrowDown");
+  assert.equal(await page.getByRole("radio").last().isChecked(), true);
+  checks.push("seleção-de-unidade-por-teclado");
   await screenshot(page, "01-unidades-da-cidade-desktop");
   await page.setViewportSize({ width: 320, height: 740 });
   await screenshot(page, "02-unidades-da-cidade-320");
