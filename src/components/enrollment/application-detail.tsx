@@ -233,9 +233,17 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
                     </dl>
                   </ReviewSection>
                 </div>
-                {admin && ["PENDING", "CORRECTION"].includes(entry.status) && (
+                {admin && ["PENDING", "CORRECTION", "APPROVED"].includes(entry.status) && (
                   <section className={s.card}>
-                    <h2>Análise da secretaria</h2>
+                    <h2>
+                      {entry.status === "APPROVED" ? "Regularização antes da matrícula" : "Análise da secretaria"}
+                    </h2>
+                    {entry.status === "APPROVED" && (
+                      <p className={s.notice}>
+                        Se precisar corrigir o endereço ou a unidade, explique o motivo e solicite ajustes. A ficha
+                        voltará para a família e precisará de nova análise antes da efetivação.
+                      </p>
+                    )}
                     {!entry.geographyRequired && (
                       <p className={s.notice}>
                         Cadastro anterior à consulta de CEP. Se o endereço estiver desatualizado ou o CEP não puder ser
@@ -258,12 +266,16 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
                       <Button disabled={busy} variant="outline" onClick={() => setAction("CORRECTION")}>
                         Solicitar ajustes
                       </Button>
-                      <Button disabled={busy} variant="outline" onClick={() => setAction("REJECTED")}>
-                        Não aprovar
-                      </Button>
-                      <Button disabled={busy || !entry.applicant.emailVerified} onClick={() => setAction("APPROVED")}>
-                        Aprovar dados
-                      </Button>
+                      {entry.status !== "APPROVED" && (
+                        <Button disabled={busy} variant="outline" onClick={() => setAction("REJECTED")}>
+                          Não aprovar
+                        </Button>
+                      )}
+                      {entry.status !== "APPROVED" && (
+                        <Button disabled={busy || !entry.applicant.emailVerified} onClick={() => setAction("APPROVED")}>
+                          Aprovar dados
+                        </Button>
+                      )}
                     </div>
                     {!entry.applicant.emailVerified && (
                       <p className={s.notice}>A aprovação será liberada após a família confirmar o e-mail.</p>

@@ -220,6 +220,102 @@ describe.skipIf(!enabled)("CEP, autorização e matrícula em PostgreSQL exclusi
     expect((await enroll(http({ ...body, preEnrollmentId: request.id }))).status).toBe(409);
     expect(await prisma.enrollment.count({ where: { preEnrollmentId: request.id } })).toBe(1);
   });
+  it("alterar o CEP exige nova decisão; retorno à unidade local invalida a exceção anterior", async () => {
+    const revised = { ...input, student: { ...input.student, cpf: "11144477735" } };
+    const draft = await requestPlacement(revised, { password: "FixtureOnly!123", requestId: randomUUID() });
+    await decidePlacement(draft.id, 1, "APPROVED", "Autorização inicial.", ids.director);
+    await requestPlacement(
+      { ...revised, student: { ...revised.student, zipCode: "85960003" } },
+      { applicationId: draft.id, applicantId: familyId, email, version: 2 }
+    );
+    let entry = await prisma.preEnrollment.findUniqueOrThrow({ where: { id: draft.id } });
+    expect(entry.status).toBe("PLACEMENT_PENDING");
+    await expect(
+      assertPlacement(
+        prisma,
+        entry.data as unknown as typeof adultApplication,
+        await lookupResidence("85960003"),
+        draft.id
+      )
+    ).rejects.toMatchObject({ status: 409 });
+    await decidePlacement(draft.id, 3, "APPROVED", "Novo CEP autorizado.", ids.director);
+    const data = {
+      ...adultApplication,
+      schoolUnitId: ids.marechal,
+      courseId: ids.course,
+      student: { ...adultApplication.student, ...revised.student, zipCode: "85960003", email: "" },
+      guardian: { ...adultApplication.student, email, name: input.contact.name },
+      relationship: "Mãe",
+    };
+    login(familyId, "APPLICANT", null);
+    expect((await correct(http({ data, version: 4 }, "PUT"), ctx(draft.id))).status).toBe(200);
+    expect(await prisma.placementRequest.count({ where: { applicationId: draft.id, status: "APPROVED" } })).toBe(0);
+    entry = await prisma.preEnrollment.findUniqueOrThrow({ where: { id: draft.id } });
+    await expect(
+      assertPlacement(prisma, { ...data, schoolUnitId: ids.toledo }, await lookupResidence("85960003"), draft.id)
+    ).rejects.toMatchObject({ status: 409 });
+    expect(entry.status).toBe("PENDING");
+  });
+  it.each([
+    ["PENDING", "00000000"],
+    ["APPROVED", "00000000"],
+    ["APPROVED", "85905010"],
+  ])("regulariza legado %s com CEP %s sem perder dados", async (status, zipCode) => {
+    const data = {
+      ...adultApplication,
+      schoolUnitId: ids.marechal,
+      courseId: ids.course,
+      student: { ...adultApplication.student, email, zipCode },
+    };
+    const entry = await prisma.preEnrollment.create({
+      data: {
+        requestId: randomUUID(),
+        protocol: `LEGACY-${status}-${zipCode}-${run}`,
+        applicantId: familyId,
+        schoolUnitId: ids.marechal,
+        courseId: ids.course,
+        studentCpf: data.student.cpf,
+        studentName: data.student.name,
+        studentId,
+        status,
+        data,
+      },
+    });
+    await expect(reviewApplication(entry.id, 1, "CORRECTION", "", ids.secretary)).rejects.toMatchObject({
+      status: 400,
+    });
+    const calls = vi.mocked(fetch).mock.calls.length;
+    await reviewApplication(entry.id, 1, "CORRECTION", "Informe o CEP residencial atual.", ids.secretary);
+    expect(vi.mocked(fetch).mock.calls.length).toBe(calls);
+    login(familyId, "APPLICANT", null);
+    expect(
+      (
+        await correct(
+          http({ data: { ...data, student: { ...data.student, zipCode: "85960002" } }, version: 2 }, "PUT"),
+          ctx(entry.id)
+        )
+      ).status
+    ).toBe(200);
+    const saved = await prisma.preEnrollment.findUniqueOrThrow({ where: { id: entry.id } });
+    expect(saved).toMatchObject({ status: "PENDING", geographyRequired: true });
+    expect(saved.data).toMatchObject({
+      favorite: data.favorite,
+      source: data.source,
+      student: { address: data.student.address, profession: data.student.profession, zipCode: "85960002" },
+    });
+    await prisma.preEnrollment.delete({ where: { id: entry.id } });
+  });
+  it("unidade fechada não recebe autorização, mas a direção pode explicar a recusa", async () => {
+    const draft = await requestPlacement(input, { password: "FixtureOnly!123", requestId: randomUUID() });
+    await prisma.schoolUnit.update({ where: { id: ids.toledo }, data: { enrollmentOpen: false } });
+    await expect(
+      decidePlacement(draft.id, 1, "APPROVED", "Não deve autorizar unidade fechada.", ids.director)
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      decidePlacement(draft.id, 1, "REJECTED", "A unidade não está recebendo pré-matrículas.", ids.director)
+    ).resolves.toEqual({ ok: true });
+    await prisma.schoolUnit.update({ where: { id: ids.toledo }, data: { enrollmentOpen: true } });
+  });
   afterAll(async () => {
     if (familyId) {
       await prisma.payment.deleteMany({ where: { studentId } });

@@ -284,7 +284,7 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
                     : "Sua pré-matrícula foi salva, mas não conseguimos enviar o e-mail de confirmação. Entre para acompanhar e tentar o reenvio, ou fale com a secretaria."}
                 </p>
               )}
-              <div className={s.actions}>
+              <div className={`${s.actions} ${s.formActions}`}>
                 <Button asChild>
                   <Link href={correction ? PRE_ENROLLMENT_PATH : PRE_ENROLLMENT_LOGIN}>
                     Acompanhar pré-matrícula <ArrowRight size={16} />
@@ -625,7 +625,7 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
                   )}
                 </div>
               )}
-              <div className={s.actions}>
+              <div className={`${s.actions} ${s.formActions}`}>
                 {step > 0 ? (
                   <Button
                     variant="outline"

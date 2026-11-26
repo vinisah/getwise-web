@@ -80,24 +80,6 @@ model PreEnrollment {
   @@map("pre_enrollments")
 }
 
-model PlacementRequest {
-  id String @id @default(cuid())
-  applicationId String
-  applicationVersion Int
-  binding String
-  snapshot Json
-  reason String
-  status String @default("PENDING")
-  feedback String @default("")
-  reviewedBy String?
-  reviewedAt DateTime?
-  createdAt DateTime @default(now())
-  application PreEnrollment @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  @@unique([applicationId, applicationVersion])
-  @@index([status, createdAt])
-  @@map("placement_requests")
-}
-
 enum Role {
   ADMIN
   TEACHER
@@ -898,4 +880,22 @@ model Cohort {
 model WhatsAppEvent {
   id String @id
   createdAt DateTime @default(now())
+}
+
+model PlacementRequest {
+  id String @id @default(cuid())
+  applicationId String
+  applicationVersion Int
+  binding String
+  snapshot Json
+  reason String
+  status String @default("PENDING")
+  feedback String @default("")
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt DateTime @default(now())
+  application PreEnrollment @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  @@unique([applicationId, applicationVersion])
+  @@index([status, createdAt])
+  @@map("placement_requests")
 }
