@@ -74,6 +74,7 @@ export function LocationPicker({
         onChange={(v) => {
           ++lookupId.current;
           setBusy(false);
+          setCity("");
           setZipCode(v);
           onResult(null);
           select("");
@@ -100,10 +101,16 @@ export function LocationPicker({
             cidade.
           </p>
         )}
+        {current && other && !alternatives.length && (
+          <p className={s.notice}>
+            Nenhuma unidade de outra cidade está aberta para pré-matrícula no momento. Consulte a secretaria ou volte às
+            unidades da sua cidade.
+          </p>
+        )}
       </div>
       {current && (
         <>
-          {other && (
+          {other && alternatives.length > 0 && (
             <>
               <h3>Solicitar outra cidade</h3>
               <Field
@@ -119,26 +126,28 @@ export function LocationPicker({
               />
             </>
           )}
-          <fieldset className={s.unitChoices}>
-            <legend>{other ? "Unidade solicitada" : "Unidades da cidade do aluno"}</legend>
-            {shown.map((u) => (
-              <label key={u.id} className={s.unitChoice}>
-                <input
-                  type="radio"
-                  name="schoolUnitId"
-                  value={u.id}
-                  checked={selected === u.id}
-                  onChange={() => select(u.id)}
-                />
-                <span>
-                  <strong>{u.name}</strong>
-                  <small>
-                    {u.city} / {u.state}
-                  </small>
-                </span>
-              </label>
-            ))}
-          </fieldset>
+          {shown.length > 0 && (
+            <fieldset className={s.unitChoices}>
+              <legend>{other ? "Unidade solicitada" : "Unidades da cidade do aluno"}</legend>
+              {shown.map((u) => (
+                <label key={u.id} className={s.unitChoice}>
+                  <input
+                    type="radio"
+                    name="schoolUnitId"
+                    value={u.id}
+                    checked={selected === u.id}
+                    onChange={() => select(u.id)}
+                  />
+                  <span>
+                    <strong>{u.name}</strong>
+                    <small>
+                      {u.city} / {u.state}
+                    </small>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          )}
           <Button
             variant="link"
             type="button"
@@ -149,7 +158,7 @@ export function LocationPicker({
           >
             {other ? "Voltar às unidades da minha cidade" : "Preciso estudar em outra cidade"}
           </Button>
-          {other && (
+          {other && alternatives.length > 0 && (
             <p className={s.notice}>
               Enviar este pedido cria uma pendência de análise. Não conclui a pré-matrícula e não reserva vaga.
             </p>

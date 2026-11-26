@@ -70,6 +70,18 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
     }
   }
   if (editing && entry) return <EnrollmentForm correction={entry} />;
+  const placement = entry?.placementRequests?.[0];
+  const placementMessages: Record<string, string> = {
+    PENDING: "Aguarde a análise. Sua pré-matrícula ainda não foi concluída e nenhuma vaga foi reservada.",
+    APPROVED:
+      "A direção autorizou esta unidade para o aluno e o CEP analisados. A vaga e a matrícula dependem das próximas etapas.",
+    REJECTED:
+      entry?.status === "PLACEMENT_REJECTED"
+        ? "A exceção não foi autorizada. Você pode escolher uma unidade da sua cidade ou revisar seu pedido."
+        : "A direção recusou o pedido para esta unidade. A unidade atual aparece no início da ficha.",
+    SUPERSEDED:
+      "Este pedido perdeu a validade após a alteração da pré-matrícula. Confira a unidade atual no início da ficha.",
+  };
   return (
     <div className={admin ? s.wide : s.shell}>
       <div className={s.wide}>
@@ -104,7 +116,7 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
                   <p>{entry.feedback}</p>
                 </div>
               )}
-              {entry.placementRequests?.[0] && (
+              {placement && (
                 <section className={s.card}>
                   <h2>
                     {entry.status === "PLACEMENT_PENDING"
@@ -112,35 +124,30 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
                       : "Pedido para estudar em outra cidade"}
                   </h2>
                   <p className={s.notice}>
-                    {entry.status === "PLACEMENT_PENDING"
-                      ? "Aguarde a análise. Sua pré-matrícula ainda não foi concluída e nenhuma vaga foi reservada."
-                      : entry.status === "PLACEMENT_REJECTED"
-                        ? "A exceção não foi autorizada. Você pode escolher uma unidade da sua cidade ou revisar seu pedido."
-                        : "A autorização vale somente para o aluno, CEP e unidade analisados. Ela não garante vaga nem efetiva a matrícula."}
+                    {placementMessages[placement.status] ?? "Consulte abaixo os dados do pedido analisado."}
                   </p>
                   <dl className={s.summary}>
                     <div>
                       <dt>Residência do aluno analisada</dt>
                       <dd>
-                        {entry.placementRequests[0].snapshot.residence.city} /{" "}
-                        {entry.placementRequests[0].snapshot.residence.state} · CEP{" "}
-                        {entry.placementRequests[0].snapshot.residence.zipCode}
+                        {placement.snapshot.residence.city} / {placement.snapshot.residence.state} · CEP{" "}
+                        {placement.snapshot.residence.zipCode}
                       </dd>
                     </div>
                     <div>
                       <dt>Unidade solicitada</dt>
-                      <dd>{entry.placementRequests[0].snapshot.unit.name}</dd>
+                      <dd>{placement.snapshot.unit.name}</dd>
                     </div>
                     <div>
                       <dt>Motivo da família</dt>
-                      <dd>{entry.placementRequests[0].reason}</dd>
+                      <dd>{placement.reason}</dd>
                     </div>
                   </dl>
-                  {entry.placementRequests[0].feedback && (
+                  {placement.feedback && (
                     <p className={s.notice}>
                       <strong>Justificativa da direção</strong>
                       <br />
-                      {entry.placementRequests[0].feedback}
+                      {placement.feedback}
                     </p>
                   )}
                   {!admin && entry.status.startsWith("PLACEMENT_") && (

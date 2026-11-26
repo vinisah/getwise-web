@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { EnrollmentForm } from "@/components/enrollment/enrollment-form";
+import { ApplicationDetail } from "@/components/enrollment/application-detail";
+import { adultApplication } from "@/test/fixtures/pre-enrollment";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/ui/app-dialog", () => ({ AppDialog: () => null }));
 vi.mock("@/components/gw/logo", () => ({ Logo: () => <span>Get Wise</span> }));
@@ -46,6 +48,48 @@ beforeEach(() => {
   );
 });
 describe("experiência de CEP aprovada", () => {
+  it("orienta a família quando só há unidades abertas na própria cidade", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json([catalog[0]]));
+    render(<EnrollmentForm />);
+    await lookup();
+    fireEvent.click(screen.getByRole("button", { name: "Preciso estudar em outra cidade" }));
+    expect(screen.getByText(/Nenhuma unidade de outra cidade está aberta/)).toBeVisible();
+    expect(screen.queryByLabelText(/Por que precisa estudar/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Solicitar análise da direção" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Voltar às unidades da minha cidade" }));
+    expect(screen.getByRole("radio", { name: /Marechal/ })).toBeVisible();
+  });
+
+  it.each([
+    ["REJECTED", /A direção recusou o pedido/],
+    ["SUPERSEDED", /Este pedido perdeu a validade/],
+  ] as const)("mantém o resultado histórico %s ao seguir pela unidade local", async (status, message) => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      Response.json({
+        id: "ficha",
+        protocol: "GW-TESTE",
+        version: 4,
+        status: "PENDING",
+        feedback: "",
+        data: adultApplication,
+        schoolUnit: catalog[0],
+        course: { title: "Inglês" },
+        applicant: { emailVerified: null },
+        placementRequests: [
+          {
+            status,
+            reason: "Transporte escolar",
+            feedback: "",
+            snapshot: { student: adultApplication.student, residence: location.residence, unit: catalog[1] },
+          },
+        ],
+      })
+    );
+    render(<ApplicationDetail id="ficha" />);
+    expect(await screen.findByText(message)).toBeVisible();
+    expect(screen.queryByText(/A direção autorizou esta unidade/)).not.toBeInTheDocument();
+  });
+
   it("envia pedido de outra cidade pelo responsável sem concluir a pré-matrícula", async () => {
     render(<EnrollmentForm />);
     await lookup();

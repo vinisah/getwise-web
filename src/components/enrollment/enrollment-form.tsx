@@ -347,7 +347,7 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
                           será pelo e-mail dele.
                         </p>
                       )}
-                      {currentLocation && other && !local && (
+                      {currentLocation && other && unit && !local && (
                         <>
                           <Field
                             name="student.cpf"
@@ -644,7 +644,13 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
                 )}
                 <Button
                   type="submit"
-                  disabled={loading || busy || !units.length || (step === 1 && !unit?.courses.length)}
+                  disabled={
+                    loading ||
+                    busy ||
+                    !units.length ||
+                    (step === 0 && other && !unit) ||
+                    (step === 1 && !unit?.courses.length)
+                  }
                   aria-busy={busy}
                 >
                   {busy
