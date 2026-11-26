@@ -197,14 +197,16 @@ export async function decidePlacement(
       const request = await tx.placementRequest.findUnique({
         where: { applicationId_applicationVersion: { applicationId: id, applicationVersion: version } },
       });
-      const unit = await openUnit(tx, application.schoolUnitId);
-      if (
-        !request ||
-        request.status !== "PENDING" ||
-        request.binding !==
-          placementBinding(application.data as unknown as ApplicationData, application.residence as Residence, unit)
-      )
+      if (!request || request.status !== "PENDING")
         throw new ApiError(409, "Os dados do pedido mudaram. A família precisa conferir a solicitação novamente.");
+      if (action === "APPROVED") {
+        const unit = await openUnit(tx, application.schoolUnitId);
+        if (
+          request.binding !==
+          placementBinding(application.data as unknown as ApplicationData, application.residence as Residence, unit)
+        )
+          throw new ApiError(409, "Os dados do pedido mudaram. A família precisa conferir a solicitação novamente.");
+      }
       await tx.placementRequest.update({
         where: { id: request.id },
         data: { status: action, feedback: feedback.trim(), reviewedBy: reviewerId, reviewedAt: new Date() },

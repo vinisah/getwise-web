@@ -102,7 +102,9 @@ export async function reviewApplication(
     async (tx) => {
       const entry = await tx.preEnrollment.findUnique({ where: { id }, include: { applicant: true, course: true } });
       if (!entry) throw new ApiError(404, "Pré-matrícula não encontrada.");
-      if (entry.version !== version || !["PENDING", "CORRECTION"].includes(entry.status))
+      const canReview =
+        ["PENDING", "CORRECTION"].includes(entry.status) || (entry.status === "APPROVED" && action === "CORRECTION");
+      if (entry.version !== version || !canReview)
         throw new ApiError(409, "Esta solicitação mudou. Atualize a página antes de continuar.");
       if (action !== "APPROVED" && !feedback.trim()) throw new ApiError(400, "Explique a decisão para a família.");
       if (action === "APPROVED" && !entry.applicant.emailVerified)
