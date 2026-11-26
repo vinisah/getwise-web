@@ -2,6 +2,24 @@
 
 Base: `b388865`. Frente isolada `codex/enrollment-cep`, sem publicação. Proposta aprovada: `get-wise-cep-proposta.html`, encaminhada pelo supervisor em 26/11/2026.
 
+## Conferência independente da supervisão
+
+A versão integrada em `codex/cep-supervisao` reúne a implementação do Código Geral e as correções de supervisão. A validação ocorreu em uma compilação local otimizada, com dados fictícios, PostgreSQL exclusivo e contas distintas para a família, a secretaria e a direção.
+
+| Cenário conferido | Resultado observado |
+| --- | --- |
+| CEP e unidade local | Os CEPs 85960-002 e 85905-010 retornaram, respectivamente, Marechal Cândido Rondon e Toledo. Cada cidade ofereceu suas duas unidades abertas do cadastro de teste. O envio do formulário gerou protocolo para análise da secretaria. |
+| Outra cidade | Foi possível pedir uma unidade específica com motivo, inclusive partindo de um município sem unidade. O protocolo ficou pendente, vinculado à família. A consulta usou o CEP do aluno menor, inclusive com o responsável residindo em outra cidade. |
+| Decisão | A secretaria consultou o pedido. Só a direção designada e autenticada por senha pôde decidir. Tanto a aprovação quanto a recusa exigiram justificativa visível no acompanhamento. |
+| Após a decisão | A aprovação permitiu retomar o formulário para o mesmo aluno, CEP e unidade. A recusa permitiu escolher uma unidade local, revisar e enviar a ficha no celular. Nenhuma decisão de exceção criou vaga, matrícula ou cobrança. |
+| Alterações e indisponibilidade | A autorização não serviu para um irmão ou outra unidade. A tela preservou os dados após CEP inexistente ou indisponibilidade simulada do provedor. Quando não havia outra unidade aberta, foi possível voltar pelo teclado para as opções locais. |
+| Ficha já aprovada antes da regra | A secretaria solicitou correção justificada. A família recuperou os dados e pediu análise para outra cidade. A tela geral de matrícula manteve a ficha vinculada durante a regularização. |
+| Histórico | A ficha distinguiu uma recusa e um pedido que perdeu a validade, mesmo depois que a pré-matrícula seguiu pela unidade local. |
+
+Na rodada geral, 505 testes passaram e 16 ficaram desabilitados pela configuração. Após a integração das correções, passaram os 29 testes específicos de CEP, interface, legado e PostgreSQL, além de seis testes de autenticação. Para executá-los no banco exclusivo da supervisão, apenas o nome permitido na trava do teste foi ajustado em uma cópia de revisão. A compilação Next.js de produção passou. Os roteiros independentes em Chrome usaram larguras de 320, 390 e 1280 pixels. A análise estática dos arquivos de aplicação alterados apontou as mesmas dez ocorrências de `any` já presentes em `auth.ts` na base.
+
+A publicação e a designação de uma conta real de direção são etapas operacionais futuras.
+
 ## Fluxo e garantias
 
 - O CEP é residencial **do aluno**, inclusive menor. O servidor consulta ViaCEP com limite de 6 segundos, valida a resposta e identifica município/UF e código IBGE; não usa prefixos. As unidades abertas do município aparecem juntas. Nomes de município são comparados sem acentos/espaços redundantes, sempre com UF. Fonte do contrato externo: [ViaCEP](https://viacep.com.br/).
