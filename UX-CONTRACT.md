@@ -1,5 +1,7 @@
 # UX Contract
 
+Pré-matrícula por CEP: o contrato de negócio e permissões está em `docs/CEP-PRE-MATRICULA.md`. `enrollment/LocationPicker` reutiliza Field, Button e o CSS de matrícula para a etapa de residência/unidade; opções de unidade usam rádio nativo e cidade usa select nativo. Consulta inválida, ausente ou indisponível impede avançar, preserva os dados e oferece nova tentativa. Respostas antigas são descartadas após alteração do CEP. Pedido pendente, recusa e autorização aparecem no acompanhamento existente; a decisão só fica disponível para direção autenticada por senha. Aprovação da exceção não é apresentada como matrícula concluída.
+
 Escopo inicial: preferências pessoais e os componentes compartilhados que as aplicam. Outros fluxos legados estão descritos em `FRONTEND_SPEC.md`; esta entrega não declara conformidade de todas as telas antigas.
 
 ## Product context

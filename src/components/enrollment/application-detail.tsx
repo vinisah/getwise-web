@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { ApplicationData, isMinor, statusLabels } from "@/lib/pre-enrollment/schema";
-import { EnrollmentForm } from "./enrollment-form";
+import { EnrollmentForm, type PlacementView } from "./enrollment-form";
 import { Field, PersonSummary, fetchJson } from "./fields";
 import s from "./enrollment.module.css";
 import { ReviewSection } from "./review-section";
@@ -17,7 +17,10 @@ type Entry = {
   feedback: string;
   studentId: string | null;
   schoolUnit: { name: string };
-  course: { title: string };
+  course: { title: string } | null;
+  placementRequests?: PlacementView[];
+  canDecidePlacement?: boolean;
+  geographyRequired?: boolean;
   applicant: { emailVerified: string | null };
 };
 export function ApplicationDetail({ id, admin = false }: { id: string; admin?: boolean }) {
@@ -52,7 +55,7 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
     setBusy(true);
     setError("");
     try {
-      await fetchJson(`/api/pre-enrollments/${id}`, {
+      await fetchJson(`/api/pre-enrollments/${id}${entry.status === "PLACEMENT_PENDING" ? "/placement" : ""}`, {
         method: "POST",
         body: JSON.stringify({ version: entry.version, action, feedback }),
       });
@@ -85,7 +88,7 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
                   <p className={s.eyebrow}>{entry.protocol}</p>
                   <h1 style={{ fontSize: 30, fontWeight: 800 }}>{entry.data.student.name}</h1>
                   <p className={s.muted}>
-                    {entry.schoolUnit.name} · {entry.course.title}
+                    {entry.schoolUnit.name} · {entry.course?.title ?? "Curso a definir após a autorização"}
                   </p>
                 </div>
                 <span className={s.pill}>{statusLabels[entry.status]}</span>
@@ -100,6 +103,89 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
                   <strong>Orientação da secretaria</strong>
                   <p>{entry.feedback}</p>
                 </div>
+              )}
+              {entry.placementRequests?.[0] && (
+                <section className={s.card}>
+                  <h2>
+                    {entry.status === "PLACEMENT_PENDING"
+                      ? "Pedido enviado à direção"
+                      : "Pedido para estudar em outra cidade"}
+                  </h2>
+                  <p className={s.notice}>
+                    {entry.status === "PLACEMENT_PENDING"
+                      ? "Aguarde a análise. Sua pré-matrícula ainda não foi concluída e nenhuma vaga foi reservada."
+                      : entry.status === "PLACEMENT_REJECTED"
+                        ? "A exceção não foi autorizada. Você pode escolher uma unidade da sua cidade ou revisar seu pedido."
+                        : "A autorização vale somente para o aluno, CEP e unidade analisados. Ela não garante vaga nem efetiva a matrícula."}
+                  </p>
+                  <dl className={s.summary}>
+                    <div>
+                      <dt>Residência do aluno analisada</dt>
+                      <dd>
+                        {entry.placementRequests[0].snapshot.residence.city} /{" "}
+                        {entry.placementRequests[0].snapshot.residence.state} · CEP{" "}
+                        {entry.placementRequests[0].snapshot.residence.zipCode}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Unidade solicitada</dt>
+                      <dd>{entry.placementRequests[0].snapshot.unit.name}</dd>
+                    </div>
+                    <div>
+                      <dt>Motivo da família</dt>
+                      <dd>{entry.placementRequests[0].reason}</dd>
+                    </div>
+                  </dl>
+                  {entry.placementRequests[0].feedback && (
+                    <p className={s.notice}>
+                      <strong>Justificativa da direção</strong>
+                      <br />
+                      {entry.placementRequests[0].feedback}
+                    </p>
+                  )}
+                  {!admin && entry.status.startsWith("PLACEMENT_") && (
+                    <div className={s.actions}>
+                      <Button variant="outline" onClick={() => setEditing(true)}>
+                        Revisar CEP ou unidade
+                      </Button>
+                      {entry.status === "PLACEMENT_AUTHORIZED" ? (
+                        <Button onClick={() => setEditing(true)}>Continuar pré-matrícula</Button>
+                      ) : (
+                        <Button disabled>Concluir pré-matrícula</Button>
+                      )}
+                    </div>
+                  )}
+                  {admin &&
+                    entry.status === "PLACEMENT_PENDING" &&
+                    (entry.canDecidePlacement ? (
+                      <>
+                        <Field
+                          name="placementFeedback"
+                          label="Justificativa da direção"
+                          type="textarea"
+                          value={feedback}
+                          onChange={setFeedback}
+                        />
+                        <p className={s.muted}>Obrigatória para autorizar ou recusar. Será apresentada à família.</p>
+                        <div className={s.actions}>
+                          <Button
+                            disabled={busy || !feedback.trim()}
+                            variant="outline"
+                            onClick={() => setAction("REJECTED")}
+                          >
+                            Recusar exceção
+                          </Button>
+                          <Button disabled={busy || !feedback.trim()} onClick={() => setAction("APPROVED")}>
+                            Autorizar esta unidade
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <p className={s.notice}>
+                        Somente a direção designada pode decidir este pedido. A secretaria acompanha o andamento.
+                      </p>
+                    ))}
+                </section>
               )}
               {!admin && entry.status === "CORRECTION" && (
                 <Button onClick={() => setEditing(true)}>Corrigir e reenviar</Button>
@@ -150,6 +236,13 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
                 {admin && ["PENDING", "CORRECTION"].includes(entry.status) && (
                   <section className={s.card}>
                     <h2>Análise da secretaria</h2>
+                    {!entry.geographyRequired && (
+                      <p className={s.notice}>
+                        Cadastro anterior à consulta de CEP. Se o endereço estiver desatualizado ou o CEP não puder ser
+                        consultado, use “Solicitar ajustes” para a família informar o CEP residencial atual. Os demais
+                        dados serão preservados.
+                      </p>
+                    )}
                     <p className={s.muted}>
                       A aprovação prepara a ficha do aluno. O plano e a matrícula são definidos em uma etapa posterior.
                     </p>
@@ -217,16 +310,22 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
         <AppDialog open={!!action} onClose={() => !busy && setAction("")} label="Confirmar decisão">
           <div style={{ padding: 24 }}>
             <h2>
-              {action === "APPROVED"
-                ? "Aprovar os dados?"
-                : action === "CORRECTION"
-                  ? "Solicitar correções?"
-                  : "Não aprovar esta solicitação?"}
+              {entry?.status === "PLACEMENT_PENDING"
+                ? action === "APPROVED"
+                  ? "Autorizar esta unidade?"
+                  : "Recusar a exceção?"
+                : action === "APPROVED"
+                  ? "Aprovar os dados?"
+                  : action === "CORRECTION"
+                    ? "Solicitar correções?"
+                    : "Não aprovar esta solicitação?"}
             </h2>
             <p>
-              {action === "APPROVED"
-                ? "A ficha do aluno será preparada para a etapa de matrícula. Não haverá cobrança nesta aprovação."
-                : "A mensagem ficará disponível para a família no acompanhamento."}
+              {entry?.status === "PLACEMENT_PENDING"
+                ? "A decisão ficará visível para a família. Autorizar permite retomar o formulário; não reserva vaga nem efetiva matrícula."
+                : action === "APPROVED"
+                  ? "A ficha do aluno será preparada para a etapa de matrícula. Não haverá cobrança nesta aprovação."
+                  : "A mensagem ficará disponível para a família no acompanhamento."}
             </p>
             {action !== "APPROVED" && !feedback.trim() && (
               <p className={s.error}>Escreva uma mensagem para explicar a decisão.</p>
@@ -235,7 +334,12 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
               <Button variant="outline" disabled={busy} onClick={() => setAction("")}>
                 Voltar
               </Button>
-              <Button disabled={busy || (action !== "APPROVED" && !feedback.trim())} onClick={decide}>
+              <Button
+                disabled={
+                  busy || ((action !== "APPROVED" || entry?.status === "PLACEMENT_PENDING") && !feedback.trim())
+                }
+                onClick={decide}
+              >
                 {busy ? "Registrando…" : "Confirmar decisão"}
               </Button>
             </div>

@@ -6,6 +6,8 @@ import { ApiError } from "@/lib/api-error";
 import { createToken, expiresIn } from "@/lib/tokens";
 import { sendVerificationEmail } from "@/lib/email";
 import { ApplicationData, isMinor } from "./schema";
+import { lookupResidence } from "./location";
+import { assertPlacement } from "./placement";
 
 export async function availableCourse(tx: Prisma.TransactionClient, data: ApplicationData) {
   const unit = await tx.schoolUnit.findUnique({
@@ -27,12 +29,14 @@ export async function sendVerification(email: string) {
   }
 }
 export async function submitApplication(data: ApplicationData, password: string, requestId: string) {
+  const residence = await lookupResidence(data.student.zipCode);
   const owner = isMinor(data.student.birthDate) ? data.guardian! : data.student;
   const existing = await prisma.user.findUnique({ where: { email: owner.email }, omit: { password: false } });
   if (existing && (!existing.isActive || !existing.password || !(await bcrypt.compare(password, existing.password))))
     throw new ApiError(409, "Esse e-mail já possui acesso. Use a senha da conta ou recupere-a na tela de login.");
   const hashed = existing ? undefined : await bcrypt.hash(password, 12);
   const result = await prisma.$transaction(async (tx) => {
+    await assertPlacement(tx, data, residence);
     await availableCourse(tx, data);
     const repeated = await tx.preEnrollment.findUnique({ where: { requestId } });
     if (repeated) {
@@ -68,6 +72,8 @@ export async function submitApplication(data: ApplicationData, password: string,
         courseId: data.courseId,
         studentCpf: data.student.cpf,
         studentName: data.student.name,
+        geographyRequired: true,
+        residence,
         data: {
           ...data,
           guardian: isMinor(data.student.birthDate) ? data.guardian : null,
@@ -88,6 +94,10 @@ export async function reviewApplication(
   feedback: string,
   reviewerId: string
 ) {
+  const candidate = action === "APPROVED" ? await prisma.preEnrollment.findUnique({ where: { id } }) : null;
+  const residence = candidate
+    ? await lookupResidence((candidate.data as unknown as ApplicationData).student.zipCode)
+    : null;
   return prisma.$transaction(
     async (tx) => {
       const entry = await tx.preEnrollment.findUnique({ where: { id }, include: { applicant: true, course: true } });
@@ -100,6 +110,9 @@ export async function reviewApplication(
       const data = entry.data as unknown as ApplicationData;
       let studentId = entry.studentId;
       if (action === "APPROVED") {
+        if (!entry.course || !residence)
+          throw new ApiError(409, "Conclua os dados e o curso antes da análise da secretaria.");
+        await assertPlacement(tx, data, residence, id);
         await availableCourse(tx, data);
         const profile = await tx.studentProfile.findUnique({ where: { cpf: data.student.cpf } });
         if (profile) studentId = profile.userId;

@@ -19,5 +19,6 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+export type DbClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

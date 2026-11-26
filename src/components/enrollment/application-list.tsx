@@ -17,7 +17,7 @@ type Item = {
   feedback: string;
   createdAt: string;
   schoolUnit: { name: string };
-  course: { title: string };
+  course: { title: string } | null;
 };
 function List({ admin }: { admin: boolean }) {
   const router = useRouter();
@@ -256,7 +256,7 @@ function List({ admin }: { admin: boolean }) {
                             </td>
                             <td data-label="Unidade / curso">
                               {item.schoolUnit.name}
-                              <small>{item.course.title}</small>
+                              <small>{item.course?.title ?? "Curso a definir"}</small>
                             </td>
                             <td data-label="Situação">
                               <span className={s.pill}>{statusLabels[item.status]}</span>
@@ -292,7 +292,7 @@ function List({ admin }: { admin: boolean }) {
                         <span className={s.pill}>{statusLabels[item.status]}</span>
                       </div>
                       <p className={s.muted}>
-                        {item.schoolUnit.name} · {item.course.title}
+                        {item.schoolUnit.name} · {item.course?.title ?? "Curso a definir"}
                       </p>
                       <p className={s.muted}>
                         {item.protocol} ·{" "}

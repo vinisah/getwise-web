@@ -54,7 +54,7 @@ model PreEnrollment {
   protocol String @unique
   applicantId String
   schoolUnitId String
-  courseId String
+  courseId String?
   studentId String?
   studentCpf String
   studentName String
@@ -64,16 +64,38 @@ model PreEnrollment {
   version Int @default(1)
   reviewedBy String?
   reviewedAt DateTime?
+  geographyRequired Boolean @default(false)
+  residence Json?
+  placementRequests PlacementRequest[]
+  enrollment Enrollment?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   applicant User @relation("Applicant", fields: [applicantId], references: [id])
   student User? @relation("ApprovedStudent", fields: [studentId], references: [id])
   schoolUnit SchoolUnit @relation(fields: [schoolUnitId], references: [id])
-  course Course @relation(fields: [courseId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id])
   @@unique([studentCpf, courseId, schoolUnitId])
   @@index([applicantId, createdAt])
   @@index([status, createdAt])
   @@map("pre_enrollments")
+}
+
+model PlacementRequest {
+  id String @id @default(cuid())
+  applicationId String
+  applicationVersion Int
+  binding String
+  snapshot Json
+  reason String
+  status String @default("PENDING")
+  feedback String @default("")
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt DateTime @default(now())
+  application PreEnrollment @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  @@unique([applicationId, applicationVersion])
+  @@index([status, createdAt])
+  @@map("placement_requests")
 }
 
 enum Role {
@@ -162,6 +184,7 @@ enum CEFRLevel {
 // ─── Usuários ────────────────────────────────────────────────────────────────
 
 model User {
+  isSchoolDirector Boolean @default(false)
   applications PreEnrollment[] @relation("Applicant")
   approvedApplications PreEnrollment[] @relation("ApprovedStudent")
   id            String    @id @default(cuid())
@@ -311,6 +334,8 @@ model Plan {
 }
 
 model Enrollment {
+  preEnrollmentId String? @unique
+  preEnrollment PreEnrollment? @relation(fields: [preEnrollmentId], references: [id])
   id          String           @id @default(cuid())
   studentId   String
   planId      String

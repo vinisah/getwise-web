@@ -60,6 +60,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest, ctx) => {
       ...(isActive !== undefined ? { isActive } : {}),
       ...(password !== undefined ? { password: await bcrypt.hash(password, 10) } : {}),
       ...(demoting ? { profileId: null } : profileId !== undefined ? { profileId } : {}),
+      ...(demoting ? { isSchoolDirector: false } : {}),
     },
     select: { id: true, name: true, email: true, role: true, isActive: true },
   });
