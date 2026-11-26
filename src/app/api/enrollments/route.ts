@@ -83,9 +83,27 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     async (tx) => {
       if (
         !parsed.data.preEnrollmentId &&
-        (await tx.preEnrollment.findFirst({ where: { studentId, status: "APPROVED" }, select: { id: true } }))
+        (await tx.preEnrollment.findFirst({
+          where: {
+            studentId,
+            status: {
+              in: [
+                "APPROVED",
+                "CORRECTION",
+                "PENDING",
+                "PLACEMENT_PENDING",
+                "PLACEMENT_AUTHORIZED",
+                "PLACEMENT_REJECTED",
+              ],
+            },
+          },
+          select: { id: true },
+        }))
       )
-        throw new ApiError(409, "Efetive a matrícula a partir da pré-matrícula aprovada deste aluno.");
+        throw new ApiError(
+          409,
+          "Este aluno tem uma pré-matrícula em andamento. Acompanhe a ficha e efetive a matrícula por ela após a aprovação."
+        );
       if (parsed.data.preEnrollmentId) {
         if (!application || !residence) throw new ApiError(409, "Pré-matrícula indisponível.");
         await assertPlacement(tx, application.data as unknown as ApplicationData, residence, application.id);

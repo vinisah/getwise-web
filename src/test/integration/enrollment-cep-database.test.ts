@@ -287,6 +287,10 @@ describe.skipIf(!enabled)("CEP, autorização e matrícula em PostgreSQL exclusi
     const calls = vi.mocked(fetch).mock.calls.length;
     await reviewApplication(entry.id, 1, "CORRECTION", "Informe o CEP residencial atual.", ids.secretary);
     expect(vi.mocked(fetch).mock.calls.length).toBe(calls);
+    login(ids.secretary);
+    const manual = await enroll(http({ studentId, planId: ids.plan, startDate: "2026-11-26" }));
+    expect(manual.status).toBe(409);
+    expect((await manual.json()).error).toContain("pré-matrícula em andamento");
     login(familyId, "APPLICANT", null);
     expect(
       (
