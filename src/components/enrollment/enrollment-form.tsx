@@ -215,7 +215,7 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
         <Logo height={40} />
         <ExitLink dirty={dirty && !done && !placementReceipt} href={correction ? "/pre-enrollments" : "/login"} />
       </header>
-      <div className={s.layout}>
+      <div className={`${s.layout} ${s.enrollmentLayout}`}>
         <aside className={s.intro}>
           <div className={s.eyebrow}>Get Wise · Sua próxima etapa</div>
           <h1>Seu inglês começa com uma conversa.</h1>
@@ -230,7 +230,7 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
               </li>
             ))}
           </ol>
-          {unit && (
+          {unit && (done || placementReceipt) && (
             <p style={{ marginTop: 30 }}>
               <MapPin size={16} style={{ display: "inline" }} /> {unit.name}
               <br />
@@ -670,6 +670,50 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
             </form>
           )}
         </div>
+        {!done && !placementReceipt && (
+          <aside className={`${s.card} ${s.enrollmentSummary}`} aria-label="Seu preenchimento">
+            <h2>Seu preenchimento</h2>
+            <dl className={s.summary}>
+              <div>
+                <dt>Aluno</dt>
+                <dd>{data.student.name || "Nome ainda não informado"}</dd>
+              </div>
+              <div>
+                <dt>Conta de acesso</dt>
+                <dd>
+                  {data.student.birthDate
+                    ? minor
+                      ? "Responsável · e-mail e senha"
+                      : "Aluno · e-mail e senha"
+                    : "Definida conforme a idade do aluno"}
+                </dd>
+              </div>
+              <div>
+                <dt>Residência do aluno</dt>
+                <dd>
+                  {currentLocation
+                    ? `${currentLocation.residence.city} / ${currentLocation.residence.state}`
+                    : "Aguardando consulta do CEP"}
+                </dd>
+                {data.student.zipCode && <dd>CEP {data.student.zipCode}</dd>}
+              </div>
+              <div>
+                <dt>{other ? "Unidade solicitada" : "Unidade selecionada"}</dt>
+                <dd>{unit?.name || "Nenhuma unidade selecionada"}</dd>
+              </div>
+              {course && (
+                <div>
+                  <dt>Curso</dt>
+                  <dd>{course.title}</dd>
+                </div>
+              )}
+            </dl>
+            <p className={s.muted}>
+              Os dados pessoais preenchidos permanecem ao trocar CEP ou unidade. A unidade e o curso serão conferidos
+              novamente.
+            </p>
+          </aside>
+        )}
       </div>
     </main>
   );

@@ -66,26 +66,28 @@ export function LocationPicker({
         Informe o CEP residencial do aluno. Para menores, use o endereço onde o aluno mora, mesmo que seja diferente do
         responsável.
       </p>
-      <Field
-        name="student.zipCode"
-        label="CEP residencial do aluno"
-        value={zipCode}
-        autoComplete="postal-code"
-        onChange={(v) => {
-          ++lookupId.current;
-          setBusy(false);
-          setCity("");
-          setZipCode(v);
-          onResult(null);
-          select("");
-          setError("");
-        }}
-        error={error}
-      />
-      <Button type="button" disabled={busy} aria-busy={busy} onClick={lookup}>
-        {busy ? "Consultando CEP…" : "Consultar CEP"}
-      </Button>
-      <div aria-live="polite">
+      <div className={s.locationSearch}>
+        <Field
+          name="student.zipCode"
+          label="CEP residencial do aluno"
+          value={zipCode}
+          autoComplete="postal-code"
+          onChange={(v) => {
+            ++lookupId.current;
+            setBusy(false);
+            setCity("");
+            setZipCode(v);
+            onResult(null);
+            select("");
+            setError("");
+          }}
+          error={error}
+        />
+        <Button type="button" disabled={busy} aria-busy={busy} onClick={lookup}>
+          {busy ? "Consultando CEP…" : "Consultar CEP"}
+        </Button>
+      </div>
+      <div aria-live="polite" className={s.locationFeedback}>
         {current && (
           <div className={s.notice}>
             <strong>
@@ -149,7 +151,7 @@ export function LocationPicker({
             </fieldset>
           )}
           <Button
-            variant="link"
+            variant="outline"
             type="button"
             onClick={() => {
               setOther(!other);

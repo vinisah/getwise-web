@@ -117,7 +117,7 @@ export function ApplicationDetail({ id, admin = false }: { id: string; admin?: b
                 </div>
               )}
               {placement && (
-                <section className={s.card}>
+                <section className={`${s.card} ${s.placementCard}`}>
                   <h2>
                     {entry.status === "PLACEMENT_PENDING"
                       ? "Pedido enviado à direção"

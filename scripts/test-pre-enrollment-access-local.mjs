@@ -148,7 +148,8 @@ try {
   await page.getByLabel(/^Senha/).fill(password);
   await page.getByLabel(/^Senha/).press("Enter");
   await page.waitForURL(`${base}/pre-enrollments`);
-  await page.getByText(`Conta de acompanhamento: ${users[0].email}`, { exact: true }).waitFor();
+  await page.getByText(users[0].email, { exact: true }).waitFor();
+  await page.getByText("Conta de acompanhamento:", { exact: true }).waitFor();
   await page
     .getByRole("link", { name: /Aluno fictício 1/ })
     .getByText("Em análise", { exact: true })

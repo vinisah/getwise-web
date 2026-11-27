@@ -597,3 +597,127 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Approved CEP and family tracking presentation; shared account tokens stay unchanged. */
+.enrollmentLayout {
+  max-width: 1050px;
+}
+.enrollmentLayout:has(.enrollmentSummary) {
+  grid-template-columns: minmax(0, 1.7fr) minmax(250px, 1fr);
+}
+.enrollmentLayout > .intro {
+  grid-column: 1 / -1;
+}
+.enrollmentSummary .summary {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+.enrollmentSummary .summary dd {
+  font-size: 15px;
+  font-weight: 600;
+}
+.enrollmentSummary > p {
+  font-size: 13px;
+}
+.locationSearch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+.locationFeedback {
+  display: grid;
+  gap: 14px;
+}
+.locationFeedback:empty {
+  display: none;
+}
+.locationFeedback .notice {
+  margin: 0;
+}
+.trackingAccount p {
+  display: grid;
+  gap: 4px;
+}
+.trackingAccount p > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.trackingAccount strong {
+  overflow-wrap: anywhere;
+}
+.trackingFilters {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr);
+  align-items: end;
+  gap: 18px;
+  margin: 20px 0;
+}
+.trackingSearch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+.trackingSearch > :nth-child(3) {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+.trackingCard {
+  display: grid;
+  gap: 14px;
+}
+.trackingCardTitle {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+.trackingCardTitle h2 {
+  margin: 0;
+}
+.trackingCard .notice {
+  margin: 0;
+}
+.trackingOpen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.trackingCard:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.placementCard {
+  display: grid;
+  gap: 18px;
+}
+.placementCard > .notice,
+.placementCard > .summary,
+.placementCard > h2 {
+  margin: 0;
+}
+.placementCard > .actions {
+  margin-top: 0;
+  padding-top: 18px;
+}
+@media (max-width: 800px) {
+  .enrollmentLayout:has(.enrollmentSummary),
+  .trackingFilters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 520px) {
+  .locationSearch {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .placementCard > .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

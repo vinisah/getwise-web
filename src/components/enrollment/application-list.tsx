@@ -110,17 +110,22 @@ function List({ admin }: { admin: boolean }) {
             </p>
           </div>
           {!admin && (
-            <Button asChild>
+            <Button asChild variant="outline">
               <Link href="/register">Nova pré-matrícula</Link>
             </Button>
           )}
         </div>
         {!admin && !loading && !error && (
-          <div className={s.notice}>
+          <div className={`${s.notice} ${s.trackingAccount}`}>
             <p>
-              {result.accountEmail
-                ? `Conta de acompanhamento: ${result.accountEmail}`
-                : "Suas solicitações aparecem nesta conta."}
+              {result.accountEmail ? (
+                <>
+                  <span>Conta de acompanhamento: </span>
+                  <strong>{result.accountEmail}</strong>
+                </>
+              ) : (
+                "Suas solicitações aparecem nesta conta."
+              )}
             </p>
             <Button variant="link" onClick={leaveTracking}>
               Entrar com outro e-mail
@@ -129,13 +134,13 @@ function List({ admin }: { admin: boolean }) {
         )}
         <form
           noValidate
-          className={admin ? `${s.card} ${s.filterPanel}` : s.toolbar}
+          className={admin ? `${s.card} ${s.filterPanel}` : `${s.card} ${s.trackingFilters}`}
           onSubmit={(e) => {
             e.preventDefault();
             filter("q", query);
           }}
         >
-          <div className={admin ? s.searchControls : undefined} style={admin ? undefined : { display: "contents" }}>
+          <div className={admin ? s.searchControls : s.trackingSearch}>
             <Field name="searchApplications" label="Buscar aluno" optional value={query} onChange={setQuery} />
             <Button type="submit" variant="outline">
               Buscar
@@ -286,20 +291,30 @@ function List({ admin }: { admin: boolean }) {
                 <p className={s.muted}>{result.total} solicitação(ões)</p>
                 <div className={s.list}>
                   {result.items.map((item) => (
-                    <Link className={s.card} href={`${path}/${item.id}`} key={item.id}>
-                      <div className={s.titleRow}>
+                    <Link className={`${s.card} ${s.trackingCard}`} href={`${path}/${item.id}`} key={item.id}>
+                      <div className={s.trackingCardTitle}>
                         <h2>{item.studentName}</h2>
                         <span className={s.pill}>{statusLabels[item.status]}</span>
                       </div>
                       <p className={s.muted}>
-                        {item.schoolUnit.name} · {item.course?.title ?? "Curso a definir"}
+                        {item.schoolUnit.name}
+                        <br />
+                        {item.course?.title ?? "Curso a definir"}
                       </p>
                       <p className={s.muted}>
-                        {item.protocol} ·{" "}
+                        Protocolo {item.protocol}
+                        <br />
+                        Enviada em{" "}
                         {new Date(item.createdAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
                       </p>
-                      {item.feedback && <p className={s.notice}>{item.feedback}</p>}
-                      <span className={s.link}>{admin ? "Analisar solicitação" : "Ver solicitação"} →</span>
+                      {item.feedback && (
+                        <p className={s.notice}>
+                          <strong>Orientação da secretaria</strong>
+                          <br />
+                          {item.feedback}
+                        </p>
+                      )}
+                      <span className={s.trackingOpen}>Ver solicitação →</span>
                     </Link>
                   ))}
                 </div>

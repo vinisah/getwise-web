@@ -146,7 +146,8 @@ describe("situação das pré-matrículas da conta", () => {
   it("identifica a conta, orienta quem não encontra a ficha e permite trocar o e-mail", async () => {
     respond();
     render(<ApplicationList />);
-    expect(await screen.findByText(/Conta de acompanhamento: responsavel@example.invalid/)).toBeInTheDocument();
+    expect(await screen.findByText("responsavel@example.invalid")).toBeInTheDocument();
+    expect(screen.getByText("Conta de acompanhamento:")).toBeInTheDocument();
     expect(screen.getByText("Nenhuma pré-matrícula vinculada a esta conta")).toBeInTheDocument();
     expect(nav.replace).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Entrar com outro e-mail" }));
