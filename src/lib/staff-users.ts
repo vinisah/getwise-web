@@ -24,6 +24,7 @@ export async function listStaffUsers(rawPage?: string | null) {
       emailVerified: true,
       createdAt: true,
       profileId: true,
+      isSchoolDirector: true,
       profile: { select: { name: true } },
     },
     orderBy: [{ role: "asc" }, { name: "asc" }, { id: "asc" }],

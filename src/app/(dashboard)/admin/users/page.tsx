@@ -129,6 +129,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                         isActive={u.isActive}
                         isSelf={u.id === me?.id}
                         profileId={u.profileId}
+                        isSchoolDirector={u.isSchoolDirector}
                         profiles={profiles}
                       />
                     ) : (

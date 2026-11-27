@@ -6,6 +6,9 @@ import { CreateEnrollmentSchema } from "@/lib/schemas";
 import { generateChargeForPayment } from "@/lib/billing/generate";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { lookupResidence } from "@/lib/pre-enrollment/location";
+import { assertPlacement } from "@/lib/pre-enrollment/placement";
+import type { ApplicationData } from "@/lib/pre-enrollment/schema";
 
 const StatusFilter = z.enum(["ACTIVE", "SUSPENDED", "CANCELLED", "COMPLETED"]);
 
@@ -63,44 +66,84 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const startYear = iso ? Number(iso[1]) : start.getUTCFullYear();
   const startMonth = iso ? Number(iso[2]) : start.getUTCMonth() + 1;
   const monthlyAmount = plan.price - discount; // centavos
+  const application = parsed.data.preEnrollmentId
+    ? await prisma.preEnrollment.findUnique({ where: { id: parsed.data.preEnrollmentId } })
+    : null;
+  if (
+    parsed.data.preEnrollmentId &&
+    (!application || application.studentId !== studentId || application.status !== "APPROVED")
+  )
+    throw new ApiError(409, "Pré-matrícula indisponível para efetivação ou aluno incompatível.");
+  const residence = application
+    ? await lookupResidence((application.data as unknown as ApplicationData).student.zipCode)
+    : null;
 
   // Atômico: cria a matrícula + a 1ª mensalidade PENDENTE (registro interno; boleto gerado à parte).
-  const { enrollment, paymentId } = await prisma.$transaction(async (tx) => {
-    if (parsed.data.preEnrollmentId) {
-      const changed = await tx.preEnrollment.updateMany({
-        where: { id: parsed.data.preEnrollmentId, studentId, status: "APPROVED" },
-        data: { status: "ENROLLED", version: { increment: 1 } },
+  const { enrollment, paymentId } = await prisma.$transaction(
+    async (tx) => {
+      if (
+        !parsed.data.preEnrollmentId &&
+        (await tx.preEnrollment.findFirst({
+          where: {
+            studentId,
+            status: {
+              in: [
+                "APPROVED",
+                "CORRECTION",
+                "PENDING",
+                "PLACEMENT_PENDING",
+                "PLACEMENT_AUTHORIZED",
+                "PLACEMENT_REJECTED",
+              ],
+            },
+          },
+          select: { id: true },
+        }))
+      )
+        throw new ApiError(
+          409,
+          "Este aluno tem uma pré-matrícula em andamento. Acompanhe a ficha e efetive a matrícula por ela após a aprovação."
+        );
+      if (parsed.data.preEnrollmentId) {
+        if (!application || !residence) throw new ApiError(409, "Pré-matrícula indisponível.");
+        await assertPlacement(tx, application.data as unknown as ApplicationData, residence, application.id);
+        const changed = await tx.preEnrollment.updateMany({
+          where: { id: parsed.data.preEnrollmentId, studentId, status: "APPROVED", version: application.version },
+          data: { status: "ENROLLED", version: { increment: 1 } },
+        });
+        if (changed.count !== 1)
+          throw new ApiError(409, "Pré-matrícula indisponível para efetivação ou aluno incompatível.");
+      }
+      const en = await tx.enrollment.create({
+        data: {
+          studentId,
+          preEnrollmentId: parsed.data.preEnrollmentId,
+          planId,
+          startDate: start,
+          discount,
+          notes: notes || null,
+          status: "ACTIVE",
+        },
+        include: { student: true, plan: true },
       });
-      if (changed.count !== 1)
-        throw new ApiError(409, "Pré-matrícula indisponível para efetivação ou aluno incompatível.");
-    }
-    const en = await tx.enrollment.create({
-      data: {
-        studentId,
-        planId,
-        startDate: start,
-        discount,
-        notes: notes || null,
-        status: "ACTIVE",
-      },
-      include: { student: true, plan: true },
-    });
 
-    const pay = await tx.payment.create({
-      data: {
-        enrollmentId: en.id,
-        studentId,
-        amount: monthlyAmount,
-        status: "PENDING",
-        description: `Mensalidade ${plan.name} — ${String(startMonth).padStart(2, "0")}/${startYear}`,
-        dueDate: start,
-        month: startMonth,
-        year: startYear,
-      },
-    });
+      const pay = await tx.payment.create({
+        data: {
+          enrollmentId: en.id,
+          studentId,
+          amount: monthlyAmount,
+          status: "PENDING",
+          description: `Mensalidade ${plan.name} — ${String(startMonth).padStart(2, "0")}/${startYear}`,
+          dueDate: start,
+          month: startMonth,
+          year: startYear,
+        },
+      });
 
-    return { enrollment: en, paymentId: pay.id };
-  });
+      return { enrollment: en, paymentId: pay.id };
+    },
+    { isolationLevel: "Serializable" }
+  );
 
   // Gera o boleto da 1ª mensalidade em background — não bloqueia nem derruba a matrícula
   // se o provedor falhar (com o Stub default vira no-op logado). O try externo protege

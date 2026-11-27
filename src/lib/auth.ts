@@ -80,6 +80,7 @@ export const authOptions: NextAuthOptions = {
           email: admin.email,
           role: admin.role,
           image: admin.image,
+          authMethod: demo ? "demo" : "password",
         };
       },
     }),
@@ -90,6 +91,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = (user as any).role as Role;
         token.id = user.id;
+        token.authMethod = user.authMethod;
       }
       // Login E requests subsequentes: revalida no DB e popula profileSections (RBAC).
       // No login NÃO retorna cedo — senão o 1º request ficaria sem profileSections e o gate
@@ -119,6 +121,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).role = token.role as Role;
         (session.user as any).id = token.id as string;
+        Object.assign(session.user, { authMethod: token.authMethod });
         (session.user as any).profileSections = ((token as any).profileSections ?? null) as string[] | null;
       }
       return session;

@@ -114,7 +114,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
           {student.approvedApplications.map((a) => (
             <div key={a.id} style={{ marginBottom: 12 }}>
               <p>
-                {a.schoolUnit.name} · {a.course.title}
+                {a.schoolUnit.name} · {a.course?.title ?? "Curso a definir"}
               </p>
               <p style={{ color: "var(--muted)" }}>
                 Conta de contato: {a.applicant.name} · {a.applicant.email} · {a.applicant.phone}

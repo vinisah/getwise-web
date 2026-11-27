@@ -156,6 +156,9 @@
 .secondaryAction svg {
   flex-shrink: 0;
 }
+.trackingAccess {
+  margin-top: 12px;
+}
 .newStudent {
   border-top: 1px solid var(--line);
   padding-top: 22px;

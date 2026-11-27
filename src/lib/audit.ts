@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import { safeAuditPayload } from "./audit-payload";
 
 export type AuditAction =
+  | "REVIEW_PLACEMENT"
   | "REVIEW_PRE_ENROLLMENT"
   | "LOGIN"
   | "LOGOUT"

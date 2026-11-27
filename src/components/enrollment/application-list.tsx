@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/gw/logo";
 import { statusLabels } from "@/lib/pre-enrollment/schema";
+import { PRE_ENROLLMENT_LOGIN } from "@/lib/pre-enrollment/access";
 import { Field, fetchJson } from "./fields";
 import s from "./enrollment.module.css";
 type Item = {
@@ -16,12 +17,12 @@ type Item = {
   feedback: string;
   createdAt: string;
   schoolUnit: { name: string };
-  course: { title: string };
+  course: { title: string } | null;
 };
 function List({ admin }: { admin: boolean }) {
   const router = useRouter();
   const search = useSearchParams();
-  const [result, setResult] = useState<{ items: Item[]; total: number; page: number }>({
+  const [result, setResult] = useState<{ items: Item[]; total: number; page: number; accountEmail?: string }>({
     items: [],
     total: 0,
     page: 1,
@@ -35,6 +36,7 @@ function List({ admin }: { admin: boolean }) {
   const searchString = search.toString();
   const requestKey = `${searchString}:${admin}:${reload}`;
   const loading = loadedFor !== requestKey;
+  const hasFilters = ["q", "status", "unit", "course", "from", "to"].some((key) => search.get(key));
   const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
   const [courses, setCourses] = useState<{ id: string; title: string }[]>([]);
   useEffect(() => {
@@ -71,6 +73,13 @@ function List({ admin }: { admin: boolean }) {
       });
     return () => ctrl.abort();
   }, [searchString, admin, requestKey]);
+  async function leaveTracking() {
+    try {
+      await signOut({ callbackUrl: PRE_ENROLLMENT_LOGIN });
+    } catch {
+      setError("Não foi possível sair. Tente novamente.");
+    }
+  }
   const path = admin ? "/admin/pre-enrollments" : "/pre-enrollments";
   function filter(k: string, v: string) {
     const next = new URLSearchParams(searchString);
@@ -84,7 +93,7 @@ function List({ admin }: { admin: boolean }) {
       {!admin && (
         <header className={s.header}>
           <Logo height={40} />
-          <Button variant="ghost" onClick={() => signOut({ callbackUrl: "/login" })}>
+          <Button variant="ghost" onClick={leaveTracking}>
             Sair da conta
           </Button>
         </header>
@@ -101,20 +110,37 @@ function List({ admin }: { admin: boolean }) {
             </p>
           </div>
           {!admin && (
-            <Button asChild>
+            <Button asChild variant="outline">
               <Link href="/register">Nova pré-matrícula</Link>
             </Button>
           )}
         </div>
+        {!admin && !loading && !error && (
+          <div className={`${s.notice} ${s.trackingAccount}`}>
+            <p>
+              {result.accountEmail ? (
+                <>
+                  <span>Conta de acompanhamento: </span>
+                  <strong>{result.accountEmail}</strong>
+                </>
+              ) : (
+                "Suas solicitações aparecem nesta conta."
+              )}
+            </p>
+            <Button variant="link" onClick={leaveTracking}>
+              Entrar com outro e-mail
+            </Button>
+          </div>
+        )}
         <form
           noValidate
-          className={admin ? `${s.card} ${s.filterPanel}` : s.toolbar}
+          className={admin ? `${s.card} ${s.filterPanel}` : `${s.card} ${s.trackingFilters}`}
           onSubmit={(e) => {
             e.preventDefault();
             filter("q", query);
           }}
         >
-          <div className={admin ? s.searchControls : undefined} style={admin ? undefined : { display: "contents" }}>
+          <div className={admin ? s.searchControls : s.trackingSearch}>
             <Field name="searchApplications" label="Buscar aluno" optional value={query} onChange={setQuery} />
             <Button type="submit" variant="outline">
               Buscar
@@ -235,7 +261,7 @@ function List({ admin }: { admin: boolean }) {
                             </td>
                             <td data-label="Unidade / curso">
                               {item.schoolUnit.name}
-                              <small>{item.course.title}</small>
+                              <small>{item.course?.title ?? "Curso a definir"}</small>
                             </td>
                             <td data-label="Situação">
                               <span className={s.pill}>{statusLabels[item.status]}</span>
@@ -265,29 +291,51 @@ function List({ admin }: { admin: boolean }) {
                 <p className={s.muted}>{result.total} solicitação(ões)</p>
                 <div className={s.list}>
                   {result.items.map((item) => (
-                    <Link className={s.card} href={`${path}/${item.id}`} key={item.id}>
-                      <div className={s.titleRow}>
+                    <Link className={`${s.card} ${s.trackingCard}`} href={`${path}/${item.id}`} key={item.id}>
+                      <div className={s.trackingCardTitle}>
                         <h2>{item.studentName}</h2>
                         <span className={s.pill}>{statusLabels[item.status]}</span>
                       </div>
                       <p className={s.muted}>
-                        {item.schoolUnit.name} · {item.course.title}
+                        {item.schoolUnit.name}
+                        <br />
+                        {item.course?.title ?? "Curso a definir"}
                       </p>
                       <p className={s.muted}>
-                        {item.protocol} ·{" "}
+                        Protocolo {item.protocol}
+                        <br />
+                        Enviada em{" "}
                         {new Date(item.createdAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
                       </p>
-                      {item.feedback && <p className={s.notice}>{item.feedback}</p>}
-                      <span className={s.link}>{admin ? "Analisar solicitação" : "Ver solicitação"} →</span>
+                      {item.feedback && (
+                        <p className={s.notice}>
+                          <strong>Orientação da secretaria</strong>
+                          <br />
+                          {item.feedback}
+                        </p>
+                      )}
+                      <span className={s.trackingOpen}>Ver solicitação →</span>
                     </Link>
                   ))}
                 </div>
                 {!result.items.length && (
-                  <div className={s.card}>Nenhuma pré-matrícula encontrada com estes filtros.</div>
+                  <div className={s.card}>
+                    {hasFilters || result.page > 1 ? (
+                      <p>Nenhuma pré-matrícula encontrada com estes filtros.</p>
+                    ) : (
+                      <>
+                        <h2>Nenhuma pré-matrícula vinculada a esta conta</h2>
+                        <p className={s.muted}>
+                          Se você já enviou o formulário, entre com o mesmo e-mail usado no cadastro. Para menores de 18
+                          anos, o acesso é pelo e-mail do responsável.
+                        </p>
+                      </>
+                    )}
+                  </div>
                 )}
               </>
             )}
-            <div className={s.actions}>
+            <nav className={`${s.actions} ${s.pagination}`} aria-label="Paginação de pré-matrículas">
               <Button
                 variant="outline"
                 disabled={result.page <= 1}
@@ -311,7 +359,7 @@ function List({ admin }: { admin: boolean }) {
               >
                 Próxima
               </Button>
-            </div>
+            </nav>
           </>
         )}
         {!admin && (

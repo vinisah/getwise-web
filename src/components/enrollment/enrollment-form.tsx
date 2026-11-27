@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, MapPin } from "lucide-react";
 import { Logo } from "@/components/gw/logo";
 import { Button } from "@/components/ui/button";
+import { PRE_ENROLLMENT_LOGIN, PRE_ENROLLMENT_PATH } from "@/lib/pre-enrollment/access";
 import {
   ApplicationSchema,
   PersonSchema,
@@ -15,6 +16,19 @@ import {
 } from "@/lib/pre-enrollment/schema";
 import { Errors, ExitLink, Field, PasswordField, PersonFields, PersonSummary, fetchJson } from "./fields";
 import s from "./enrollment.module.css";
+import { LocationPicker, type LocationResult } from "./location-picker";
+import { PlacementSchema } from "@/lib/pre-enrollment/placement-schema";
+import type { Residence } from "@/lib/pre-enrollment/location-contract";
+export type PlacementView = {
+  status: string;
+  reason: string;
+  feedback: string;
+  snapshot: {
+    student: { name: string; cpf: string; birthDate: string; zipCode: string };
+    residence: Residence;
+    unit: { id: string; name: string; city: string; state: string };
+  };
+};
 export type CatalogUnit = {
   id: string;
   name: string;
@@ -23,7 +37,13 @@ export type CatalogUnit = {
   consultants: string[];
   courses: { course: { id: string; title: string; level: string } }[];
 };
-type Correction = { id: string; version: number; data: ApplicationData; protocol: string };
+type Correction = {
+  id: string;
+  version: number;
+  data: ApplicationData;
+  protocol: string;
+  placementRequests?: PlacementView[];
+};
 export function EnrollmentForm({ correction }: { correction?: Correction }) {
   const [data, setData] = useState<ApplicationData>(correction?.data ?? structuredClone(emptyApplication));
   const [units, setUnits] = useState<CatalogUnit[]>([]);
@@ -31,6 +51,10 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
   const [error, setError] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const [step, setStep] = useState(0);
+  const [location, setLocation] = useState<LocationResult | null>(null);
+  const [other, setOther] = useState(!!correction?.placementRequests?.length);
+  const [reason, setReason] = useState(correction?.placementRequests?.[0]?.reason ?? "");
+  const [placementReceipt, setPlacementReceipt] = useState<{ id: string; protocol: string } | null>(null);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -42,6 +66,19 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
   const minor = !!data.student.birthDate && isMinor(data.student.birthDate);
   const unit = units.find((u) => u.id === data.schoolUnitId);
   const course = unit?.courses.find((c) => c.course.id === data.courseId)?.course;
+  const currentLocation = location?.residence.zipCode === data.student.zipCode.replace(/\D/g, "") ? location : null;
+  const approval = correction?.placementRequests?.[0];
+  const authorized =
+    approval?.status === "APPROVED" &&
+    approval.snapshot.unit.id === data.schoolUnitId &&
+    approval.snapshot.student.cpf === data.student.cpf.replace(/\D/g, "") &&
+    approval.snapshot.student.name === data.student.name.trim() &&
+    approval.snapshot.student.birthDate === data.student.birthDate &&
+    approval.snapshot.residence.zipCode === currentLocation?.residence.zipCode &&
+    approval.snapshot.residence.municipalityCode === currentLocation?.residence.municipalityCode;
+  const local = !!currentLocation?.localUnitIds.includes(data.schoolUnitId);
+  const eligible = !!currentLocation && (local || authorized);
+  const contact = minor ? (data.guardian ?? emptyPerson) : data.student;
   useEffect(() => {
     const ctrl = new AbortController();
     fetchJson("/api/auth/enrollment-catalog", { signal: ctrl.signal })
@@ -77,17 +114,63 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
     setError("");
     setErrors({});
     if (step === 0) {
+      if (!currentLocation) {
+        setError("Consulte o CEP residencial do aluno antes de continuar.");
+        document.getElementById("student.zipCode")?.focus();
+        return;
+      }
       const check = PersonSchema.pick({ name: true, birthDate: true }).safeParse(data.student);
       const issues = check.success ? [] : check.error.issues.map((i) => ({ ...i, path: ["student", ...i.path] }));
       if (!unit)
         issues.unshift({ code: "custom", path: ["schoolUnitId"], message: "Selecione uma unidade disponível." });
       if (issues.length) return showIssues(issues);
+      if (!local && !authorized) {
+        const input = {
+          student: data.student,
+          schoolUnitId: data.schoolUnitId,
+          reason,
+          contact: { name: contact.name, email: contact.email },
+        };
+        const parsed = PlacementSchema.safeParse(input);
+        if (!parsed.success) return showIssues(parsed.error.issues);
+        if (!correction && (password.length < 8 || password.length > 72))
+          return showIssues([{ path: "password", message: "Use uma senha entre 8 e 72 caracteres." }]);
+        requestId.current ??= crypto.randomUUID();
+        setBusy(true);
+        try {
+          const response = await fetchJson(
+            correction ? `/api/pre-enrollments/${correction.id}/placement` : "/api/auth/enrollment-placement",
+            {
+              method: correction ? "PUT" : "POST",
+              body: JSON.stringify({
+                data: parsed.data,
+                password,
+                requestId: requestId.current,
+                version: correction?.version,
+              }),
+            }
+          );
+          setPlacementReceipt(response);
+          setDirty(false);
+          setPassword("");
+        } catch (e) {
+          setError((e as Error).message);
+        } finally {
+          setBusy(false);
+        }
+        return;
+      }
       if (minor && !data.guardian) setData((d) => ({ ...d, guardian: { ...emptyPerson } }));
       if (!minor && data.guardian) setData((d) => ({ ...d, guardian: null, relationship: "" }));
       setStep(1);
       return;
     }
     const check = ApplicationSchema.safeParse(data);
+    if (!eligible) {
+      setStep(0);
+      setError("Confira novamente o CEP e a unidade antes de enviar.");
+      return;
+    }
     if (!check.success) {
       setStep(1);
       return showIssues(check.error.issues);
@@ -130,9 +213,9 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
     <main className={s.shell}>
       <header className={s.header}>
         <Logo height={40} />
-        <ExitLink dirty={dirty && !done} href={correction ? "/pre-enrollments" : "/login"} />
+        <ExitLink dirty={dirty && !done && !placementReceipt} href={correction ? "/pre-enrollments" : "/login"} />
       </header>
-      <div className={s.layout}>
+      <div className={`${s.layout} ${s.enrollmentLayout}`}>
         <aside className={s.intro}>
           <div className={s.eyebrow}>Get Wise · Sua próxima etapa</div>
           <h1>Seu inglês começa com uma conversa.</h1>
@@ -140,14 +223,14 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
             Conte um pouco sobre você. Nossa secretaria vai analisar sua pré-matrícula e orientar os próximos passos.
           </p>
           <ol className={s.steps}>
-            {["Para começar", "Sobre o aluno", "Revisar e enviar"].map((label, i) => (
+            {["Residência e unidade", "Dados e curso", "Revisão e envio"].map((label, i) => (
               <li key={label} aria-current={!done && step === i ? "step" : undefined}>
                 <span className={s.stepNumber}>{done || i < step ? "✓" : i + 1}</span>
                 {label}
               </li>
             ))}
           </ol>
-          {unit && (
+          {unit && (done || placementReceipt) && (
             <p style={{ marginTop: 30 }}>
               <MapPin size={16} style={{ display: "inline" }} /> {unit.name}
               <br />
@@ -156,7 +239,31 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
           )}
         </aside>
         <div className={s.card}>
-          {done ? (
+          {placementReceipt ? (
+            <>
+              <h2 ref={heading} tabIndex={-1}>
+                Pedido enviado à direção
+              </h2>
+              <p className={s.notice}>
+                Aguarde a análise. Sua pré-matrícula ainda não foi concluída e nenhuma vaga foi reservada.
+              </p>
+              <p>
+                Protocolo <strong>{placementReceipt.protocol}</strong>
+              </p>
+              <p>
+                {data.student.name} · {unit?.name}
+              </p>
+              <p className={s.muted}>
+                Entre com o e-mail e a senha do cadastro {minor ? "do responsável" : "do aluno"} para acompanhar a
+                decisão e continuar.
+              </p>
+              <Button asChild>
+                <Link href={correction ? `/pre-enrollments/${correction.id}` : PRE_ENROLLMENT_LOGIN}>
+                  Acompanhar pedido
+                </Link>
+              </Button>
+            </>
+          ) : done ? (
             <>
               <CheckCircle2 size={38} color="var(--success)" />
               <h2 ref={heading} tabIndex={-1} style={{ marginTop: 20 }}>
@@ -177,9 +284,9 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
                     : "Sua pré-matrícula foi salva, mas não conseguimos enviar o e-mail de confirmação. Entre para acompanhar e tentar o reenvio, ou fale com a secretaria."}
                 </p>
               )}
-              <div className={s.actions}>
+              <div className={`${s.actions} ${s.formActions}`}>
                 <Button asChild>
-                  <Link href={correction ? "/pre-enrollments" : "/login?callbackUrl=/pre-enrollments"}>
+                  <Link href={correction ? PRE_ENROLLMENT_PATH : PRE_ENROLLMENT_LOGIN}>
                     Acompanhar pré-matrícula <ArrowRight size={16} />
                   </Link>
                 </Button>
@@ -188,12 +295,12 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
           ) : (
             <form noValidate onSubmit={submit}>
               <h2 ref={heading} tabIndex={-1}>
-                {["Vamos começar pelo essencial", "Conhecendo o aluno", "Tudo certo para enviar?"][step]}
+                {["Onde o aluno vai estudar?", "Conhecendo o aluno", "Tudo certo para enviar?"][step]}
               </h2>
               <p className={s.muted}>
                 {
                   [
-                    "Escolha a unidade e informe quem vai estudar.",
+                    "Consulte o CEP, escolha a unidade e informe quem vai estudar.",
                     "Os campos com * são obrigatórios. Quando necessário, informe “Não se aplica”.",
                     "Confira as informações. Você pode voltar e corrigir qualquer campo.",
                   ][step]
@@ -203,17 +310,21 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
                 {step === 0 && (
                   <section className={s.section}>
                     <div className={s.stack}>
-                      <Field
-                        name="schoolUnitId"
-                        label="Unidade Get Wise"
-                        value={data.schoolUnitId}
-                        onChange={(v) => {
+                      <LocationPicker
+                        zipCode={data.student.zipCode}
+                        setZipCode={(v) => update("student", { ...data.student, zipCode: v })}
+                        units={units}
+                        selected={data.schoolUnitId}
+                        select={(v) => {
                           setData((d) => ({ ...d, schoolUnitId: v, courseId: "", consultant: "Secretaria" }));
                           setDirty(true);
                         }}
-                        error={errors.schoolUnitId}
-                        options={units.map((u) => ({ value: u.id, label: `${u.name} — ${u.city}/${u.state}` }))}
+                        result={location}
+                        onResult={setLocation}
+                        other={other}
+                        setOther={setOther}
                       />
+                      {errors.schoolUnitId && <p className={s.error}>{errors.schoolUnitId}</p>}
                       <Field
                         name="student.name"
                         label="Nome completo do aluno"
@@ -235,6 +346,57 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
                           Como o aluno tem menos de 18 anos, também vamos precisar dos dados do responsável. O acesso
                           será pelo e-mail dele.
                         </p>
+                      )}
+                      {currentLocation && other && unit && !local && (
+                        <>
+                          <Field
+                            name="student.cpf"
+                            label="CPF do aluno"
+                            value={data.student.cpf}
+                            onChange={(v) => update("student", { ...data.student, cpf: v })}
+                            error={errors["student.cpf"]}
+                          />
+                          {authorized ? (
+                            <p className={s.notice}>
+                              Exceção autorizada para este aluno, CEP e unidade. A pré-matrícula ainda será analisada
+                              pela secretaria.
+                            </p>
+                          ) : (
+                            <>
+                              <Field
+                                name="reason"
+                                label="Por que precisa estudar nesta unidade?"
+                                type="textarea"
+                                value={reason}
+                                onChange={setReason}
+                                error={errors.reason}
+                              />
+                              {minor && (
+                                <Field
+                                  name="contact.name"
+                                  label="Nome completo do responsável"
+                                  value={contact.name}
+                                  onChange={(v) => update("guardian", { ...contact, name: v })}
+                                  error={errors["contact.name"]}
+                                />
+                              )}
+                              <Field
+                                name="contact.email"
+                                label={minor ? "E-mail de acesso do responsável" : "E-mail de acesso do aluno"}
+                                type="email"
+                                value={contact.email}
+                                onChange={(v) => update(minor ? "guardian" : "student", { ...contact, email: v })}
+                                error={errors["contact.email"]}
+                              />
+                              {!correction && (
+                                <>
+                                  <p className={s.muted}>Crie uma senha ou use a senha da sua conta existente.</p>
+                                  <PasswordField value={password} onChange={setPassword} error={errors.password} />
+                                </>
+                              )}
+                            </>
+                          )}
+                        </>
                       )}
                     </div>
                   </section>
@@ -463,7 +625,7 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
                   )}
                 </div>
               )}
-              <div className={s.actions}>
+              <div className={`${s.actions} ${s.formActions}`}>
                 {step > 0 ? (
                   <Button
                     variant="outline"
@@ -482,7 +644,13 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
                 )}
                 <Button
                   type="submit"
-                  disabled={loading || busy || !units.length || (step === 1 && !unit?.courses.length)}
+                  disabled={
+                    loading ||
+                    busy ||
+                    !units.length ||
+                    (step === 0 && other && !unit) ||
+                    (step === 1 && !unit?.courses.length)
+                  }
                   aria-busy={busy}
                 >
                   {busy
@@ -491,13 +659,61 @@ export function EnrollmentForm({ correction }: { correction?: Correction }) {
                       ? correction
                         ? "Enviar correções"
                         : "Enviar pré-matrícula"
-                      : "Continuar"}
+                      : step === 1
+                        ? "Revisar pré-matrícula"
+                        : other && !eligible
+                          ? "Solicitar análise da direção"
+                          : "Continuar com esta unidade"}
                   <ArrowRight size={16} />
                 </Button>
               </div>
             </form>
           )}
         </div>
+        {!done && !placementReceipt && (
+          <aside className={`${s.card} ${s.enrollmentSummary}`} aria-label="Seu preenchimento">
+            <h2>Seu preenchimento</h2>
+            <dl className={s.summary}>
+              <div>
+                <dt>Aluno</dt>
+                <dd>{data.student.name || "Nome ainda não informado"}</dd>
+              </div>
+              <div>
+                <dt>Conta de acesso</dt>
+                <dd>
+                  {data.student.birthDate
+                    ? minor
+                      ? "Responsável · e-mail e senha"
+                      : "Aluno · e-mail e senha"
+                    : "Definida conforme a idade do aluno"}
+                </dd>
+              </div>
+              <div>
+                <dt>Residência do aluno</dt>
+                <dd>
+                  {currentLocation
+                    ? `${currentLocation.residence.city} / ${currentLocation.residence.state}`
+                    : "Aguardando consulta do CEP"}
+                </dd>
+                {data.student.zipCode && <dd>CEP {data.student.zipCode}</dd>}
+              </div>
+              <div>
+                <dt>{other ? "Unidade solicitada" : "Unidade selecionada"}</dt>
+                <dd>{unit?.name || "Nenhuma unidade selecionada"}</dd>
+              </div>
+              {course && (
+                <div>
+                  <dt>Curso</dt>
+                  <dd>{course.title}</dd>
+                </div>
+              )}
+            </dl>
+            <p className={s.muted}>
+              Os dados pessoais preenchidos permanecem ao trocar CEP ou unidade. A unidade e o curso serão conferidos
+              novamente.
+            </p>
+          </aside>
+        )}
       </div>
     </main>
   );

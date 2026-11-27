@@ -14,6 +14,24 @@ const authorize = (
 ).options.authorize;
 afterEach(() => vi.unstubAllEnvs());
 describe("acesso individual e avaliação local", () => {
+  it("mantém origem demo no JWT/sessão mesmo se o administrador escolhido for diretor", async () => {
+    vi.stubEnv("GETWISE_LOCAL_DEMO", "1");
+    vi.stubEnv("VERCEL", "");
+    vi.stubEnv("DATABASE_URL", "postgresql://127.0.0.1:55432/getwise_feature");
+    vi.mocked(prisma.user.findFirst).mockResolvedValueOnce({
+      id: "oldest-director",
+      role: "ADMIN",
+      isActive: true,
+      isSchoolDirector: true,
+      email: "director@example.invalid",
+    } as never);
+    const user = await authorize({ demo: "1" }, { headers: { host: "127.0.0.1:3001" } });
+    expect(user).toMatchObject({ id: "oldest-director", authMethod: "demo" });
+    vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({ role: "ADMIN", isActive: true, profile: null } as never);
+    const token = await authOptions.callbacks!.jwt!({ token: {}, user } as never);
+    const session = await authOptions.callbacks!.session!({ token, session: { user: {} } } as never);
+    expect(session).toMatchObject({ user: { id: "oldest-director", authMethod: "demo" } });
+  });
   it("credenciais vazias não autenticam administrador", async () => {
     vi.stubEnv("GETWISE_LOCAL_DEMO", "");
     expect(await authorize({}, { headers: { host: "127.0.0.1:3001" } })).toBeNull();

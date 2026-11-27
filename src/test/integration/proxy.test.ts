@@ -16,11 +16,33 @@ beforeEach(() => {
   vi.mocked(prisma.user.findUnique).mockImplementation((args) => {
     const sections: Record<string, string[] | null> = { a1: null, a2: ["financial"], a3: ["dashboard"], a4: [] };
     const currentSections = sections[args.where.id ?? ""];
-    return Promise.resolve({ isActive: true, role: args.where.id === "s1" ? "STUDENT" : "ADMIN", profile: currentSections == null ? null : { sections: currentSections } }) as never;
+    return Promise.resolve({
+      isActive: true,
+      role: args.where.id === "s1" ? "STUDENT" : "ADMIN",
+      profile: currentSections == null ? null : { sections: currentSections },
+    }) as never;
   });
 });
 
 describe("proxy — gate RBAC de páginas admin", () => {
+  it("leva acompanhamento sem sessão ao login preservando a solicitação desejada", async () => {
+    mockToken.mockResolvedValueOnce(null as never);
+    const res = await go("/pre-enrollments/entry-1");
+    const location = new URL(res.headers.get("location")!);
+    expect(location.pathname).toBe("/login");
+    expect(location.searchParams.get("callbackUrl")).toBe("/pre-enrollments/entry-1");
+  });
+  it("permite que o pré-matriculado abra o acompanhamento sem redirecionar ao formulário", async () => {
+    mockToken.mockResolvedValueOnce({ id: "family-1", role: "APPLICANT" } as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
+      isActive: true,
+      role: "APPLICANT",
+      profile: null,
+    } as never);
+    const res = await go("/pre-enrollments");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
   it("revoga acesso mesmo quando o JWT ainda declara dono", async () => {
     mockToken.mockResolvedValueOnce({ id: "a3", role: "ADMIN", profileSections: null } as never);
     const res = await go("/admin/financial");

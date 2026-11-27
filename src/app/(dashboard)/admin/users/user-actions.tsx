@@ -16,6 +16,7 @@ export function UserActions({
   isSelf,
   profileId,
   profiles,
+  isSchoolDirector = false,
 }: {
   userId: string;
   role: string;
@@ -23,6 +24,7 @@ export function UserActions({
   isSelf: boolean;
   profileId?: string | null;
   profiles?: { id: string; name: string }[];
+  isSchoolDirector?: boolean;
 }) {
   const router = useRouter();
   const [pwOpen, setPwOpen] = useState(false);
@@ -116,6 +118,7 @@ export function UserActions({
 
   return (
     <div style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+      {isSchoolDirector && <span className="text-xs">Direção designada</span>}
       <select
         value={role}
         aria-label="Papel na equipe"

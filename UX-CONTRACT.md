@@ -1,5 +1,7 @@
 # UX Contract
 
+Pré-matrícula por CEP: o contrato de negócio e permissões está em `docs/CEP-PRE-MATRICULA.md`. `enrollment/LocationPicker` reutiliza Field, Button e o CSS de matrícula para a etapa de residência/unidade; opções de unidade usam rádio nativo e cidade usa select nativo. Consulta inválida, ausente ou indisponível impede avançar, preserva os dados e oferece nova tentativa. Respostas antigas são descartadas após alteração do CEP. Pedido pendente, recusa e autorização aparecem no acompanhamento existente; a decisão só fica disponível para direção autenticada por senha. Aprovação da exceção não é apresentada como matrícula concluída.
+
 Escopo inicial: preferências pessoais e os componentes compartilhados que as aplicam. Outros fluxos legados estão descritos em `FRONTEND_SPEC.md`; esta entrega não declara conformidade de todas as telas antigas.
 
 ## Product context
@@ -66,6 +68,10 @@ Listas de pré-matrículas têm paginação de 20 itens e filtros na URL; nomes 
 Visual: identidade existente, etapas reais acima do formulário, seções claras e uma coluna no celular. O acabamento aprovado usa cards compactos com cantos de 22 px, limitado ao módulo de matrícula. Ações longas quebram sem sair dos cards ou dos diálogos; campos em até 800 px usam 16 px e botões têm alvo mínimo de 44 px. Sem tokens novos de cor ou fonte; CSS usa `theme.ts`/`globals.css`. Controles nativos preservam teclado e acessibilidade de plataforma.
 
 Login usa e-mail e senha individuais. O botão de demonstração só existe quando `GETWISE_LOCAL_DEMO=1`, sem Vercel, em banco local `getwise_feature` e host loopback. O iniciador local configura essa condição para avaliação; produção não oferece esse acesso.
+
+Conforme escolha do usuário em 26/11/2026, o botão **Acompanhar pré-matrícula** do login e do comprovante de envio abre `/login?mode=pre-enrollment`, usando o e-mail e a senha criados no cadastro. Para menores, o e-mail é o do responsável. Após autenticar, o destino é `/pre-enrollments` ou o detalhe solicitado; o formulário de nova inscrição nunca é um destino automático desse acesso. Links anteriores com `callbackUrl=/pre-enrollments` continuam válidos. O login comum preserva o destino interno do portal.
+
+A lista identifica o e-mail da sessão e mostra todas as solicitações vinculadas àquela conta. A API filtra por `applicantId` autenticado, sem consulta pública por e-mail. **Entrar com outro e-mail** encerra a sessão e retorna ao acesso de acompanhamento. Uma conta sem solicitações recebe orientação para conferir o e-mail do cadastro; filtros sem resultado mantêm mensagem distinta. Erros preservam os campos, permitem nova tentativa e não levam à inscrição. Testes: `pre-enrollment-access.test.tsx`, `pre-enrollment.test.ts`, `proxy.test.ts` e `scripts/test-pre-enrollment-access-local.mjs`.
 
 Apresentação aprovada do login: card de 22 px, faixa móvel da marca, campos de 50 px com fonte de 16 px e ações de pelo menos 44 px. Mostrar/ocultar senha é um botão com nome acessível e estado pressionado; não envia o formulário. Recuperação de senha, matrícula, verificação de e-mail, mensagens de erro, bloqueio durante envio e destino interno após autenticação preservam seus fluxos. O tema público é restrito ao login e não grava preferências da conta.
 

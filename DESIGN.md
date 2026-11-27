@@ -60,6 +60,8 @@ Hanken Grotesk é a família de títulos e corpo já adotada no produto; Spline 
 
 ## Layout
 
+CEP e acompanhamento da família: a proposta aprovada usa resumo de preenchimento ao lado do formulário no computador e abaixo dele até 800 px. A consulta de CEP alinha campo e ação no computador; no celular, empilha ambos. A alternativa de outra cidade usa botão outline. A lista pública agrupa filtros em card, separa a identificação da conta do e-mail e mantém situação, protocolo, data e orientação em blocos legíveis. A análise da direção usa o mesmo card e espaçamento, preservando estados e permissões. Essas variantes pertencem a `enrollment.module.css`; não substituem a tabela administrativa nem alteram o login.
+
 Unidades e pré-matrículas administrativas seguem a organização da proposta aprovada: filtros dentro de card, identificação e contatos lado a lado no detalhe da unidade, tabela de solicitações no desktop e linhas empilhadas com rótulos no celular. `ReviewSection` mantém seções recolhíveis nativas; identificação, contatos e cursos começam abertos, informações complementares fechadas. Cores continuam herdadas do tema da conta. As alterações ficam restritas às novas áreas administrativas, preservando a apresentação pública e as demais telas.
 
 Pré-matrícula, unidades e análise: acabamento aprovado com espaçamento compacto (20 px nos cards) e cantos de 22 px, restrito a `components/enrollment/enrollment.module.css`. As etapas ficam acima do formulário e os campos passam a uma coluna no celular. Até 800 px, campos usam 16 px e ações têm área de toque mínima de 44 px; rótulos longos quebram dentro do botão, inclusive nos diálogos. Os tokens de cor e fonte e as demais telas continuam compartilhados, sem alteração.

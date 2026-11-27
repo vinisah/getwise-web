@@ -55,5 +55,5 @@ export const GET = withErrorHandler(async (req) => {
     }),
     prisma.preEnrollment.count({ where }),
   ]);
-  return NextResponse.json({ items, total, page });
+  return NextResponse.json({ items, total, page, ...(!admin ? { accountEmail: session.user.email } : {}) });
 });

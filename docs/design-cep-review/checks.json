@@ -1,0 +1,70 @@
+{
+  "checks": [
+    {
+      "name": "cep-local",
+      "width": 1280,
+      "overflow": false
+    },
+    {
+      "name": "cep-local",
+      "width": 320,
+      "overflow": false
+    },
+    {
+      "name": "outra-cidade",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "name": "acompanhamento",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "name": "acompanhamento",
+      "width": 1280,
+      "overflow": false
+    },
+    {
+      "name": "autorizada",
+      "width": 320,
+      "overflow": false
+    },
+    {
+      "name": "pendente-simulado",
+      "width": 320,
+      "overflow": false
+    },
+    {
+      "name": "recusa-simulada",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "name": "direcao-simulada",
+      "width": 1280,
+      "overflow": false
+    },
+    {
+      "name": "direcao-simulada",
+      "width": 320,
+      "overflow": false
+    },
+    {
+      "name": "confirmacao-direcao-simulada",
+      "width": 320,
+      "overflow": false
+    },
+    {
+      "name": "erro-consulta-simulado",
+      "width": 320,
+      "overflow": false
+    },
+    {
+      "name": "nome preservado após indisponibilidade",
+      "pass": true
+    }
+  ],
+  "runtimeErrors": [],
+  "scope": "UI local; respostas de pendência, recusa, direção e indisponibilidade simuladas; consultas e acompanhamento autorizado com banco de teste."
+}

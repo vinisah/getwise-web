@@ -64,6 +64,26 @@ describe("pré-matrícula: validação e permissões", () => {
       expect.objectContaining({ where: { id: "entry-1", applicantId: "family-2" } })
     );
   });
+  it("usa a conta autenticada mesmo que alguém envie outro e-mail ou applicantId na consulta", async () => {
+    session.mockResolvedValueOnce({
+      user: { id: "family-1", email: "family-1@example.invalid", role: "APPLICANT" },
+    } as never);
+    const r = await list(
+      new NextRequest("http://localhost/api/pre-enrollments?email=family-2@example.invalid&applicantId=family-2")
+    );
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ accountEmail: "family-1@example.invalid", items: [] });
+    expect(prisma.preEnrollment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { applicantId: "family-1" } })
+    );
+    expect(prisma.preEnrollment.count).toHaveBeenCalledWith({ where: { applicantId: "family-1" } });
+  });
+  it("não permite consultar pré-matrícula apenas informando um e-mail sem login", async () => {
+    session.mockResolvedValueOnce(null);
+    const r = await list(new NextRequest("http://localhost/api/pre-enrollments?email=family-1@example.invalid"));
+    expect(r.status).toBe(401);
+    expect(prisma.preEnrollment.findMany).not.toHaveBeenCalled();
+  });
   it("pré-matriculado não acessa operações acadêmicas antigas", async () => {
     session.mockResolvedValueOnce({ user: { id: "family-1", role: "APPLICANT" } } as never);
     await expect(requireAuth()).rejects.toMatchObject({ status: 403 });

@@ -150,6 +150,9 @@ export const emptyApplication: ApplicationData = {
   favorite: "",
 };
 export const statusLabels: Record<string, string> = {
+  PLACEMENT_PENDING: "Aguardando direção",
+  PLACEMENT_AUTHORIZED: "Exceção autorizada",
+  PLACEMENT_REJECTED: "Exceção recusada",
   PENDING: "Em análise",
   CORRECTION: "Ajustes solicitados",
   APPROVED: "Aprovada para matrícula",
